@@ -1,103 +1,144 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
-/// Edit this file to define custom logic or remove it if it is not needed.
-/// Learn more about FRAME and the core library of Substrate FRAME pallets:
-/// https://substrate.dev/docs/en/knowledgebase/runtime/frame
+use sp_std::prelude::*;
+use sp_runtime::{
+	traits::{StaticLookup, Zero, AccountIdConversion}
+};
+use frame_support::{
+	traits::{Currency, EnsureOrigin, ReservableCurrency, OnUnbalanced, Get},
+    PalletId,
+};
 
-use frame_support::{decl_module, decl_storage, decl_event, decl_error, dispatch, traits::Get};
-use frame_system::ensure_signed;
 
-#[cfg(test)]
-mod mock;
+use frame_support::{
+	decl_event, decl_module, decl_storage,
+	dispatch::{DispatchError, DispatchResult},
+	traits::{ExistenceRequirement::AllowDeath, Imbalance},
+};
 
-#[cfg(test)]
-mod tests;
+use frame_support::codec::{Encode, Decode};
 
-/// Configure the pallet by specifying the parameters and types on which it depends.
-pub trait Config: frame_system::Config {
-	/// Because this pallet emits events, it depends on the runtime's definition of an event.
-	type Event: From<Event<Self>> + Into<<Self as frame_system::Config>::Event>;
-}
+use sp_io::hashing::{blake2_128, blake2_256, twox_64, twox_128, twox_256};
 
-// The pallet's runtime storage items.
-// https://substrate.dev/docs/en/knowledgebase/runtime/storage
-decl_storage! {
-	// A unique name is used to ensure that the pallet's storage items are isolated.
-	// This name may be updated, but each pallet in the runtime must use a unique name.
-	// ---------------------------------vvvvvvvvvvvvvv
-	trait Store for Module<T: Config> as TemplateModule {
-		// Learn more about declaring storage items:
-		// https://substrate.dev/docs/en/knowledgebase/runtime/storage#declaring-storage-items
-		Something get(fn something): Option<u32>;
+
+pub use pallet::*;
+
+
+
+#[frame_support::pallet]
+pub mod pallet {
+	use frame_support::pallet_prelude::*;
+	use frame_system::pallet_prelude::*;
+	use super::*;
+
+    type BalanceOf<T> = <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
+
+
+    #[derive(Encode, Decode, Default, Clone, PartialEq)]
+    pub struct SellLock {
+        order_id: [u8; 16],
+        value: u64,
+        timeout: u32,
+    }
+
+	#[pallet::pallet]
+	#[pallet::generate_store(trait Store)]
+	pub struct Pallet<T>(PhantomData<T>);
+
+
+	#[pallet::config]
+	pub trait Config: frame_system::Config {
+        /// PalletId for the crowdloan pallet. An appropriate value could be ```PalletId(*b"py/cfund")```
+		#[pallet::constant]
+		type PalletId: Get<PalletId>;
+
+		/// The overarching event type.
+		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
+
+        /// The currency type that the charity deals in
+        type Currency: Currency<Self::AccountId>;
 	}
-}
 
-// Pallets use events to inform users when important changes are made.
-// https://substrate.dev/docs/en/knowledgebase/runtime/events
-decl_event!(
-	pub enum Event<T> where AccountId = <T as frame_system::Config>::AccountId {
-		/// Event documentation should end with an array that provides descriptive names for event
-		/// parameters. [something, who]
-		SomethingStored(u32, AccountId),
-	}
-);
 
-// Errors inform users that something went wrong.
-decl_error! {
-	pub enum Error for Module<T: Config> {
-		/// Error names should be descriptive.
-		NoneValue,
-		/// Errors should have helpful documentation associated with them.
-		StorageOverflow,
-	}
-}
+	#[pallet::call]
+	impl<T: Config> Pallet<T> {
 
-// Dispatchable functions allows users to interact with the pallet and invoke state changes.
-// These functions materialize as "extrinsics", which are often compared to transactions.
-// Dispatchable functions must be annotated with a weight and must return a DispatchResult.
-decl_module! {
-	pub struct Module<T: Config> for enum Call where origin: T::Origin {
-		// Errors must be initialized if they are used by the pallet.
-		type Error = Error<T>;
 
-		// Events must be initialized if they are used by the pallet.
-		fn deposit_event() = default;
+		#[pallet::weight(50_000_000)]
+		pub(super) fn add_to_order(origin: OriginFor<T>, amount: BalanceOf<T>, price: u128) -> DispatchResultWithPostInfo {
+            let sender = ensure_signed(origin)?;
 
-		/// An example dispatchable that takes a singles value as a parameter, writes the value to
-		/// storage and emits an event. This function must be dispatched by a signed extrinsic.
-		#[weight = 10_000 + T::DbWeight::get().writes(1)]
-		pub fn do_something(origin, something: u32) -> dispatch::DispatchResult {
-			// Check that the extrinsic was signed and get the signer.
-			// This function will return an error if the extrinsic is not signed.
-			// https://substrate.dev/docs/en/knowledgebase/runtime/origin
-			let who = ensure_signed(origin)?;
+            let order_id: [u8; 16] = blake2_128(&[sender.encode(), price.to_ne_bytes().to_vec()].concat());
 
-			// Update storage.
-			Something::put(something);
+            T::Currency::transfer(&sender, &Self::fund_account_id(), amount, AllowDeath)
+            				.map_err(|_| DispatchError::Other("Can't make donation"))?;
 
-			// Emit an event.
-			Self::deposit_event(RawEvent::SomethingStored(something, who));
-			// Return a successful DispatchResult
-			Ok(())
+            let order_total = <OrderIdValues<T>>::get(order_id);
+
+            <OrderIdValues<T>>::insert(order_id, order_total + price);
+			Ok(().into())
 		}
 
-		/// An example dispatchable that may throw a custom error.
-		#[weight = 10_000 + T::DbWeight::get().reads_writes(1,1)]
-		pub fn cause_error(origin) -> dispatch::DispatchResult {
-			let _who = ensure_signed(origin)?;
-
-			// Read a value from storage.
-			match Something::get() {
-				// Return an error if the value has not been set.
-				None => Err(Error::<T>::NoneValue)?,
-				Some(old) => {
-					// Increment the value read from storage; will error in the event of overflow.
-					let new = old.checked_add(1).ok_or(Error::<T>::StorageOverflow)?;
-					// Update the value in storage with the incremented result.
-					Something::put(new);
-					Ok(())
-				},
-			}
+        #[pallet::weight(50_000_000)]
+		pub(super) fn remove_from_order(origin: OriginFor<T>, price: u64, value: u64) -> DispatchResultWithPostInfo {
+			Ok(().into())
 		}
+
+        #[pallet::weight(50_000_000)]
+		pub(super) fn lock_sell(origin: OriginFor<T>, price: u64, hashed_secret: [u8; 32], timeout: u64, value: u64) -> DispatchResultWithPostInfo {
+			Ok(().into())
+		}
+
+        #[pallet::weight(50_000_000)]
+		pub(super) fn unlock_sell(origin: OriginFor<T>, secret: [u8; 32]) -> DispatchResultWithPostInfo {
+			Ok(().into())
+		}
+
+        #[pallet::weight(50_000_000)]
+		pub(super) fn timeout_sell(origin: OriginFor<T>, price: u64, hashed_secret: [u8; 32]) -> DispatchResultWithPostInfo {
+			Ok(().into())
+		}
+	}
+
+	#[pallet::event]
+	#[pallet::metadata(T::AccountId = "AccountId", BalanceOf<T> = "Balance")]
+	#[pallet::generate_deposit(pub(super) fn deposit_event)]
+	// pub enum Event<T> where AccountId = <T as frame_system::Config>::AccountId, Balance = BalanceOf<T> {
+	pub enum Event<T: Config> {
+		/// A name was set. \[who\]
+		NameSet(T::AccountId),
+		/// A name was forcibly set. \[target\]
+		NameForced(T::AccountId),
+		/// A name was changed. \[who\]
+		NameChanged(T::AccountId),
+	}
+
+	/// Error for the nicks module.
+	#[pallet::error]
+	pub enum Error<T> {
+		/// A name is too short.
+		TooShort,
+		/// A name is too long.
+		TooLong,
+		/// An account isn't named.
+		Unnamed,
+	}
+
+    #[pallet::storage]
+    #[pallet::getter(fn order_id_value)]
+    pub(super) type OrderIdValues<T: Config> = StorageMap<_, Blake2_128Concat, [u8; 16], u128, ValueQuery>;
+
+    #[pallet::storage]
+    #[pallet::getter(fn sell_lock)]
+    pub(super) type SellLocks<T: Config> = StorageMap<_, Blake2_128Concat, [u8; 32], SellLock, ValueQuery>;
+}
+
+impl<T: Config> Pallet<T> {
+	/// The account ID of the fund pot.
+	///
+	/// This actually does computation. If you need to keep using it, then make sure you cache the
+	/// value and only call this once.
+	pub fn fund_account_id() -> T::AccountId {
+		T::PalletId::get().into_sub_account(0)
 	}
 }
