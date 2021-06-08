@@ -35,9 +35,9 @@ pub mod pallet {
 
 
     #[derive(Encode, Decode, Default, Clone, PartialEq)]
-    pub struct SellLock {
+    pub struct SellLock<Balance> {
         order_id: [u8; 16],
-        value: u64,
+        value: Balance,
         timeout: u32,
     }
 
@@ -86,23 +86,45 @@ pub mod pallet {
             // Check there is enough.
             let order_total = <OrderIdValues<T>>::get(order_id);
             frame_support::ensure!(value < order_total, Error::<T>::OrderTooSmall);
+            // Move the value from the pallet to the sender.
+            T::Currency::transfer(&Self::fund_account_id(), &sender, value, AllowDeath)
+            				.map_err(|_| DispatchError::Other("Can't transfer value."))?;
             // Remove value from order.
             <OrderIdValues<T>>::insert(order_id, order_total - value);
 			Ok(().into())
 		}
 
         #[pallet::weight(50_000_000)]
-		pub(super) fn lock_sell(origin: OriginFor<T>, price: u64, hashed_secret: [u8; 32], timeout: u64, value: u64) -> DispatchResultWithPostInfo {
+		pub(super) fn lock_sell(origin: OriginFor<T>, price: u128, hashed_secret: [u8; 32], timeout: u32, value: BalanceOf<T>) -> DispatchResultWithPostInfo {
+            let sender = ensure_signed(origin)?;
+            // Calculate orderId.
+            let order_id: [u8; 16] = blake2_128(&[sender.encode(), price.to_ne_bytes().to_vec()].concat());
+            // Check there is enough.
+            let order_total = <OrderIdValues<T>>::get(order_id);
+            frame_support::ensure!(value < order_total, Error::<T>::OrderTooSmall);
+            // Move value into sell lock.
+            <OrderIdValues<T>>::insert(order_id, order_total - value);
+
+            let sell_lock: SellLock<BalanceOf<T>> = SellLock {
+                order_id: order_id,
+                value: value,
+                timeout: timeout,
+            };
+            <SellLocks<T>>::insert(hashed_secret, sell_lock);
 			Ok(().into())
 		}
 
         #[pallet::weight(50_000_000)]
 		pub(super) fn unlock_sell(origin: OriginFor<T>, secret: [u8; 32]) -> DispatchResultWithPostInfo {
+            let sender = ensure_signed(origin)?;
 			Ok(().into())
 		}
 
         #[pallet::weight(50_000_000)]
-		pub(super) fn timeout_sell(origin: OriginFor<T>, price: u64, hashed_secret: [u8; 32]) -> DispatchResultWithPostInfo {
+		pub(super) fn timeout_sell(origin: OriginFor<T>, price: u128, hashed_secret: [u8; 32]) -> DispatchResultWithPostInfo {
+            let sender = ensure_signed(origin)?;
+            // Calculate orderId.
+            let order_id: [u8; 16] = blake2_128(&[sender.encode(), price.to_ne_bytes().to_vec()].concat());
 			Ok(().into())
 		}
 	}
@@ -133,7 +155,7 @@ pub mod pallet {
 
     #[pallet::storage]
     #[pallet::getter(fn sell_lock)]
-    pub(super) type SellLocks<T: Config> = StorageMap<_, Blake2_128Concat, [u8; 32], SellLock, ValueQuery>;
+    pub(super) type SellLocks<T: Config> = StorageMap<_, Blake2_128Concat, [u8; 32], SellLock<BalanceOf<T>>, ValueQuery>;
 }
 
 impl<T: Config> Pallet<T> {
