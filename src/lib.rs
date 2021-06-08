@@ -65,22 +65,29 @@ pub mod pallet {
 
 
 		#[pallet::weight(50_000_000)]
-		pub(super) fn add_to_order(origin: OriginFor<T>, amount: BalanceOf<T>, price: u128) -> DispatchResultWithPostInfo {
+		pub(super) fn add_to_order(origin: OriginFor<T>, price: u128, value: BalanceOf<T>) -> DispatchResultWithPostInfo {
             let sender = ensure_signed(origin)?;
-
+            // Calculate orderId.
             let order_id: [u8; 16] = blake2_128(&[sender.encode(), price.to_ne_bytes().to_vec()].concat());
-
-            T::Currency::transfer(&sender, &Self::fund_account_id(), amount, AllowDeath)
-            				.map_err(|_| DispatchError::Other("Can't make donation"))?;
-
+            // Move the value from the sender to the pallet.
+            T::Currency::transfer(&sender, &Self::fund_account_id(), value, AllowDeath)
+            				.map_err(|_| DispatchError::Other("Can't transfer value."))?;
+            // Add value to order.
             let order_total = <OrderIdValues<T>>::get(order_id);
-
-            <OrderIdValues<T>>::insert(order_id, order_total + price);
+            <OrderIdValues<T>>::insert(order_id, order_total + value);
 			Ok(().into())
 		}
 
         #[pallet::weight(50_000_000)]
-		pub(super) fn remove_from_order(origin: OriginFor<T>, price: u64, value: u64) -> DispatchResultWithPostInfo {
+		pub(super) fn remove_from_order(origin: OriginFor<T>, price: u128, value: BalanceOf<T>) -> DispatchResultWithPostInfo {
+            let sender = ensure_signed(origin)?;
+            // Calculate orderId.
+            let order_id: [u8; 16] = blake2_128(&[sender.encode(), price.to_ne_bytes().to_vec()].concat());
+            // Check there is enough.
+            let order_total = <OrderIdValues<T>>::get(order_id);
+            frame_support::ensure!(value < order_total, Error::<T>::OrderTooSmall);
+            // Remove value from order.
+            <OrderIdValues<T>>::insert(order_id, order_total - value);
 			Ok(().into())
 		}
 
@@ -116,17 +123,13 @@ pub mod pallet {
 	/// Error for the nicks module.
 	#[pallet::error]
 	pub enum Error<T> {
-		/// A name is too short.
-		TooShort,
-		/// A name is too long.
-		TooLong,
-		/// An account isn't named.
-		Unnamed,
+        // The order has too little value.
+        OrderTooSmall,
 	}
 
     #[pallet::storage]
     #[pallet::getter(fn order_id_value)]
-    pub(super) type OrderIdValues<T: Config> = StorageMap<_, Blake2_128Concat, [u8; 16], u128, ValueQuery>;
+    pub(super) type OrderIdValues<T: Config> = StorageMap<_, Blake2_128Concat, [u8; 16], BalanceOf<T>, ValueQuery>;
 
     #[pallet::storage]
     #[pallet::getter(fn sell_lock)]
