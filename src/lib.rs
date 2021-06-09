@@ -123,8 +123,18 @@ pub mod pallet {
         #[pallet::weight(50_000_000)]
 		pub(super) fn timeout_sell(origin: OriginFor<T>, price: u128, hashed_secret: [u8; 32]) -> DispatchResultWithPostInfo {
             let sender = ensure_signed(origin)?;
+            let _now = <pallet_timestamp::Pallet<T>>::get();
             // Calculate orderId.
             let order_id: [u8; 16] = blake2_128(&[sender.encode(), price.to_ne_bytes().to_vec()].concat());
+            // Check orderId is correct and lock has timed out.
+            let lock = <SellLocks<T>>::get(hashed_secret);
+            frame_support::ensure!(lock.order_id == order_id, Error::<T>::WrongOrderId);
+            frame_support::ensure!(lock.timeout <= _now, Error::<T>::LockNotTimedOut);
+            // Delete lock.
+            <SellLocks<T>>::remove(hashed_secret);
+            // Return funds to sell order.
+            let order_total = <OrderIdValues<T>>::get(order_id);
+            <OrderIdValues<T>>::insert(order_id, order_total + lock.value);
 			Ok(().into())
 		}
 	}
@@ -147,8 +157,12 @@ pub mod pallet {
 	pub enum Error<T> {
         // The order has too little value.
         OrderTooSmall,
+        // The order ID is incorrect.
+        WrongOrderId,
         // The lock has timed out.
         LockTimedOut,
+        // The lock has not timed out.
+        LockNotTimedOut,
 	}
 
     #[pallet::storage]
