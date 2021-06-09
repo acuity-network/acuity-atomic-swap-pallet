@@ -1,25 +1,14 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use sp_std::prelude::*;
-use sp_runtime::{
-	traits::{StaticLookup, Zero, AccountIdConversion}
-};
+use sp_runtime::traits::AccountIdConversion;
 use frame_support::{
-	traits::{Currency, EnsureOrigin, ReservableCurrency, OnUnbalanced, Get},
+    traits::{ExistenceRequirement::AllowDeath},
+	traits::{Currency, Get},
     PalletId,
 };
 
-
-use frame_support::{
-	decl_event, decl_module, decl_storage,
-	dispatch::{DispatchError, DispatchResult},
-	traits::{ExistenceRequirement::AllowDeath, Imbalance},
-};
-
-use frame_support::codec::{Encode, Decode};
-
-use sp_io::hashing::{blake2_128, blake2_256, twox_64, twox_128, twox_256};
-
+use sp_io::hashing::{blake2_128, keccak_256};
 
 pub use pallet::*;
 
@@ -35,10 +24,10 @@ pub mod pallet {
 
 
     #[derive(Encode, Decode, Default, Clone, PartialEq)]
-    pub struct SellLock<Balance> {
+    pub struct SellLock<Balance, Moment> {
         order_id: [u8; 16],
         value: Balance,
-        timeout: u32,
+        timeout: Moment,
     }
 
 	#[pallet::pallet]
@@ -47,7 +36,7 @@ pub mod pallet {
 
 
 	#[pallet::config]
-	pub trait Config: frame_system::Config {
+    pub trait Config: pallet_timestamp::Config + frame_system::Config {
         /// PalletId for the crowdloan pallet. An appropriate value could be ```PalletId(*b"py/cfund")```
 		#[pallet::constant]
 		type PalletId: Get<PalletId>;
@@ -95,7 +84,7 @@ pub mod pallet {
 		}
 
         #[pallet::weight(50_000_000)]
-		pub(super) fn lock_sell(origin: OriginFor<T>, price: u128, hashed_secret: [u8; 32], timeout: u32, value: BalanceOf<T>) -> DispatchResultWithPostInfo {
+		pub(super) fn lock_sell(origin: OriginFor<T>, price: u128, hashed_secret: [u8; 32], timeout: T::Moment, value: BalanceOf<T>) -> DispatchResultWithPostInfo {
             let sender = ensure_signed(origin)?;
             // Calculate orderId.
             let order_id: [u8; 16] = blake2_128(&[sender.encode(), price.to_ne_bytes().to_vec()].concat());
@@ -105,7 +94,7 @@ pub mod pallet {
             // Move value into sell lock.
             <OrderIdValues<T>>::insert(order_id, order_total - value);
 
-            let sell_lock: SellLock<BalanceOf<T>> = SellLock {
+            let sell_lock: SellLock<BalanceOf<T>, T::Moment> = SellLock {
                 order_id: order_id,
                 value: value,
                 timeout: timeout,
@@ -117,6 +106,17 @@ pub mod pallet {
         #[pallet::weight(50_000_000)]
 		pub(super) fn unlock_sell(origin: OriginFor<T>, secret: [u8; 32]) -> DispatchResultWithPostInfo {
             let sender = ensure_signed(origin)?;
+			let _now = <pallet_timestamp::Pallet<T>>::get();
+            // Calculate hashed secret.
+            let hashed_secret: [u8; 32] = keccak_256(&secret);
+            // Check sell lock has not timed out.
+            let lock = <SellLocks<T>>::get(hashed_secret);
+            frame_support::ensure!(lock.timeout > _now, Error::<T>::LockTimedOut);
+            // Delete lock.
+            <SellLocks<T>>::remove(hashed_secret);
+            // Send the funds. Cast value to uint128 for Solang compatibility.
+            T::Currency::transfer(&Self::fund_account_id(), &sender, lock.value, AllowDeath)
+            				.map_err(|_| DispatchError::Other("Can't transfer value."))?;
 			Ok(().into())
 		}
 
@@ -147,6 +147,8 @@ pub mod pallet {
 	pub enum Error<T> {
         // The order has too little value.
         OrderTooSmall,
+        // The lock has timed out.
+        LockTimedOut,
 	}
 
     #[pallet::storage]
@@ -155,7 +157,7 @@ pub mod pallet {
 
     #[pallet::storage]
     #[pallet::getter(fn sell_lock)]
-    pub(super) type SellLocks<T: Config> = StorageMap<_, Blake2_128Concat, [u8; 32], SellLock<BalanceOf<T>>, ValueQuery>;
+    pub(super) type SellLocks<T: Config> = StorageMap<_, Blake2_128Concat, [u8; 32], SellLock<BalanceOf<T>, T::Moment>, ValueQuery>;
 }
 
 impl<T: Config> Pallet<T> {
