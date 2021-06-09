@@ -12,6 +12,9 @@ use sp_io::hashing::{blake2_128, keccak_256};
 
 pub use pallet::*;
 
+use sp_std::{
+	convert::TryInto,
+};
 
 
 #[frame_support::pallet]
@@ -26,6 +29,13 @@ pub mod pallet {
     #[derive(Encode, Decode, Default, Clone, PartialEq)]
     pub struct SellLock<Balance, Moment> {
         order_id: [u8; 16],
+        value: Balance,
+        timeout: Moment,
+    }
+
+    #[derive(Encode, Decode, Default, Clone, PartialEq)]
+    pub struct BuyLock<AccountId, Balance, Moment> {
+        seller: AccountId,
         value: Balance,
         timeout: Moment,
     }
@@ -51,7 +61,6 @@ pub mod pallet {
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
-
 
 		#[pallet::weight(50_000_000)]
 		pub(super) fn add_to_order(origin: OriginFor<T>, price: u128, value: BalanceOf<T>) -> DispatchResultWithPostInfo {
@@ -114,7 +123,7 @@ pub mod pallet {
             frame_support::ensure!(lock.timeout > _now, Error::<T>::LockTimedOut);
             // Delete lock.
             <SellLocks<T>>::remove(hashed_secret);
-            // Send the funds. Cast value to uint128 for Solang compatibility.
+            // Send the funds.
             T::Currency::transfer(&Self::fund_account_id(), &sender, lock.value, AllowDeath)
             				.map_err(|_| DispatchError::Other("Can't transfer value."))?;
 			Ok(().into())
@@ -135,6 +144,59 @@ pub mod pallet {
             // Return funds to sell order.
             let order_total = <OrderIdValues<T>>::get(order_id);
             <OrderIdValues<T>>::insert(order_id, order_total + lock.value);
+			Ok(().into())
+		}
+
+        #[pallet::weight(50_000_000)]
+		pub(super) fn lock_buy(origin: OriginFor<T>, hashed_secret: [u8; 32], seller: T::AccountId, timeout: T::Moment, value: BalanceOf<T>, order_id: [u8; 16]) -> DispatchResultWithPostInfo {
+            let sender = ensure_signed(origin)?;
+            // Ensure hashed secret is not already in use.
+            let lock = <BuyLocks<T>>::get(hashed_secret);
+            frame_support::ensure!(TryInto::<u64>::try_into(lock.value).ok() == Some(0), Error::<T>::HashedSecretAlreadyInUse);
+            // Move the value from the sender to the pallet.
+            T::Currency::transfer(&sender, &Self::fund_account_id(), value, AllowDeath)
+            				.map_err(|_| DispatchError::Other("Can't transfer value."))?;
+            // Store lock data.
+            let lock: BuyLock<T::AccountId, BalanceOf<T>, T::Moment> = BuyLock {
+                seller: seller,
+                value: value,
+                timeout: timeout,
+            };
+            <BuyLocks<T>>::insert(hashed_secret, lock);
+			Ok(().into())
+		}
+
+        #[pallet::weight(50_000_000)]
+		pub(super) fn unlock_buy(origin: OriginFor<T>, secret: [u8; 32]) -> DispatchResultWithPostInfo {
+            let sender = ensure_signed(origin)?;
+            let _now = <pallet_timestamp::Pallet<T>>::get();
+            // Calculate hashed secret.
+            let hashed_secret: [u8; 32] = keccak_256(&secret);
+            // Check lock has not timed out.
+            let lock = <BuyLocks<T>>::get(hashed_secret);
+            frame_support::ensure!(lock.timeout > _now, Error::<T>::LockTimedOut);
+            // Delete lock.
+            <BuyLocks<T>>::remove(hashed_secret);
+            // Send the funds.
+            T::Currency::transfer(&Self::fund_account_id(), &lock.seller, lock.value, AllowDeath)
+            				.map_err(|_| DispatchError::Other("Can't transfer value."))?;
+			Ok(().into())
+		}
+
+        #[pallet::weight(50_000_000)]
+		pub(super) fn timeout_buy(origin: OriginFor<T>, secret: [u8; 32]) -> DispatchResultWithPostInfo {
+            let sender = ensure_signed(origin)?;
+            let _now = <pallet_timestamp::Pallet<T>>::get();
+            // Calculate hashed secret.
+            let hashed_secret: [u8; 32] = keccak_256(&secret);
+            // Check lock has timed out.
+            let lock = <BuyLocks<T>>::get(hashed_secret);
+            frame_support::ensure!(lock.timeout <= _now, Error::<T>::LockNotTimedOut);
+            // Delete lock.
+            <BuyLocks<T>>::remove(hashed_secret);
+            // Send the funds.
+            T::Currency::transfer(&Self::fund_account_id(), &sender, lock.value, AllowDeath)
+            				.map_err(|_| DispatchError::Other("Can't transfer value."))?;
 			Ok(().into())
 		}
 	}
@@ -163,6 +225,8 @@ pub mod pallet {
         LockTimedOut,
         // The lock has not timed out.
         LockNotTimedOut,
+        // The hashed secret is already in use.
+        HashedSecretAlreadyInUse,
 	}
 
     #[pallet::storage]
@@ -172,6 +236,10 @@ pub mod pallet {
     #[pallet::storage]
     #[pallet::getter(fn sell_lock)]
     pub(super) type SellLocks<T: Config> = StorageMap<_, Blake2_128Concat, [u8; 32], SellLock<BalanceOf<T>, T::Moment>, ValueQuery>;
+
+    #[pallet::storage]
+    #[pallet::getter(fn buy_lock)]
+    pub(super) type BuyLocks<T: Config> = StorageMap<_, Blake2_128Concat, [u8; 32], BuyLock<T::AccountId, BalanceOf<T>, T::Moment>, ValueQuery>;
 }
 
 impl<T: Config> Pallet<T> {
