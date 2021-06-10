@@ -65,7 +65,7 @@ pub mod pallet {
 		#[pallet::weight(50_000_000)]
 		pub(super) fn add_to_order(origin: OriginFor<T>, price: u128, value: BalanceOf<T>) -> DispatchResultWithPostInfo {
             let sender = ensure_signed(origin)?;
-            // Calculate orderId.
+            // Calculate order_id.
             let order_id: [u8; 16] = blake2_128(&[sender.encode(), price.to_ne_bytes().to_vec()].concat());
             // Move the value from the sender to the pallet.
             T::Currency::transfer(&sender, &Self::fund_account_id(), value, AllowDeath)
@@ -73,13 +73,14 @@ pub mod pallet {
             // Add value to order.
             let order_total = <OrderIdValues<T>>::get(order_id);
             <OrderIdValues<T>>::insert(order_id, order_total + value);
+            Self::deposit_event(Event::AddToOrder(sender, order_id, price, value));
 			Ok(().into())
 		}
 
         #[pallet::weight(50_000_000)]
 		pub(super) fn remove_from_order(origin: OriginFor<T>, price: u128, value: BalanceOf<T>) -> DispatchResultWithPostInfo {
             let sender = ensure_signed(origin)?;
-            // Calculate orderId.
+            // Calculate order_id.
             let order_id: [u8; 16] = blake2_128(&[sender.encode(), price.to_ne_bytes().to_vec()].concat());
             // Check there is enough.
             let order_total = <OrderIdValues<T>>::get(order_id);
@@ -89,13 +90,14 @@ pub mod pallet {
             				.map_err(|_| DispatchError::Other("Can't transfer value."))?;
             // Remove value from order.
             <OrderIdValues<T>>::insert(order_id, order_total - value);
+            Self::deposit_event(Event::RemoveFromOrder(sender, order_id, price, value));
 			Ok(().into())
 		}
 
         #[pallet::weight(50_000_000)]
 		pub(super) fn lock_sell(origin: OriginFor<T>, price: u128, hashed_secret: [u8; 32], timeout: T::Moment, value: BalanceOf<T>) -> DispatchResultWithPostInfo {
             let sender = ensure_signed(origin)?;
-            // Calculate orderId.
+            // Calculate order_id.
             let order_id: [u8; 16] = blake2_128(&[sender.encode(), price.to_ne_bytes().to_vec()].concat());
             // Check there is enough.
             let order_total = <OrderIdValues<T>>::get(order_id);
@@ -109,6 +111,7 @@ pub mod pallet {
                 timeout: timeout,
             };
             <SellLocks<T>>::insert(hashed_secret, sell_lock);
+            Self::deposit_event(Event::LockSell(order_id, hashed_secret, sender, value, timeout));
 			Ok(().into())
 		}
 
@@ -126,6 +129,7 @@ pub mod pallet {
             // Send the funds.
             T::Currency::transfer(&Self::fund_account_id(), &sender, lock.value, AllowDeath)
             				.map_err(|_| DispatchError::Other("Can't transfer value."))?;
+            Self::deposit_event(Event::UnlockSell(hashed_secret, sender, lock.value, secret));
 			Ok(().into())
 		}
 
@@ -133,9 +137,9 @@ pub mod pallet {
 		pub(super) fn timeout_sell(origin: OriginFor<T>, price: u128, hashed_secret: [u8; 32]) -> DispatchResultWithPostInfo {
             let sender = ensure_signed(origin)?;
             let _now = <pallet_timestamp::Pallet<T>>::get();
-            // Calculate orderId.
+            // Calculate order_id.
             let order_id: [u8; 16] = blake2_128(&[sender.encode(), price.to_ne_bytes().to_vec()].concat());
-            // Check orderId is correct and lock has timed out.
+            // Check order_id is correct and lock has timed out.
             let lock = <SellLocks<T>>::get(hashed_secret);
             frame_support::ensure!(lock.order_id == order_id, Error::<T>::WrongOrderId);
             frame_support::ensure!(lock.timeout <= _now, Error::<T>::LockNotTimedOut);
@@ -144,6 +148,7 @@ pub mod pallet {
             // Return funds to sell order.
             let order_total = <OrderIdValues<T>>::get(order_id);
             <OrderIdValues<T>>::insert(order_id, order_total + lock.value);
+            Self::deposit_event(Event::TimeoutSell(hashed_secret, order_id, lock.value));
 			Ok(().into())
 		}
 
@@ -158,11 +163,12 @@ pub mod pallet {
             				.map_err(|_| DispatchError::Other("Can't transfer value."))?;
             // Store lock data.
             let lock: BuyLock<T::AccountId, BalanceOf<T>, T::Moment> = BuyLock {
-                seller: seller,
+                seller: seller.clone(),
                 value: value,
                 timeout: timeout,
             };
             <BuyLocks<T>>::insert(hashed_secret, lock);
+            Self::deposit_event(Event::LockBuy(order_id, hashed_secret, seller, value, timeout));
 			Ok(().into())
 		}
 
@@ -180,6 +186,7 @@ pub mod pallet {
             // Send the funds.
             T::Currency::transfer(&Self::fund_account_id(), &lock.seller, lock.value, AllowDeath)
             				.map_err(|_| DispatchError::Other("Can't transfer value."))?;
+            Self::deposit_event(Event::UnlockBuy(hashed_secret, lock.seller, lock.value));
 			Ok(().into())
 		}
 
@@ -197,21 +204,31 @@ pub mod pallet {
             // Send the funds.
             T::Currency::transfer(&Self::fund_account_id(), &sender, lock.value, AllowDeath)
             				.map_err(|_| DispatchError::Other("Can't transfer value."))?;
+            Self::deposit_event(Event::TimeoutBuy(hashed_secret, sender, lock.value));
 			Ok(().into())
 		}
 	}
 
 	#[pallet::event]
-	#[pallet::metadata(T::AccountId = "AccountId", BalanceOf<T> = "Balance")]
+	#[pallet::metadata(T::AccountId = "AccountId", BalanceOf<T> = "Value", T::Moment = "Timestamp")]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
-	// pub enum Event<T> where AccountId = <T as frame_system::Config>::AccountId, Balance = BalanceOf<T> {
 	pub enum Event<T: Config> {
-		/// A name was set. \[who\]
-		NameSet(T::AccountId),
-		/// A name was forcibly set. \[target\]
-		NameForced(T::AccountId),
-		/// A name was changed. \[who\]
-		NameChanged(T::AccountId),
+        // Value was added to a sell order. \[seller\], \[order_id\], \[price\], \[value\]
+        AddToOrder(T::AccountId, [u8; 16], u128, BalanceOf<T>),
+        // Value was removed from a sell order. \[seller\], \[order_id\], \[price\], \[value\]
+        RemoveFromOrder(T::AccountId, [u8; 16], u128, BalanceOf<T>),
+        // A sell lock was created. \[order_id\], \[hashed_secret\], \[seller\], \[value\], \[timeout\]
+        LockSell([u8; 16], [u8; 32], T::AccountId, BalanceOf<T>, T::Moment),
+        // A sell lock was unlocked \[hashed_secret\], \[buyer\], \[value\], \[secret\]
+        UnlockSell([u8; 32], T::AccountId, BalanceOf<T>, [u8; 32]),
+        // A sell lock was timed out. \[hashed_secret\], \[order_id\], \[value\]
+        TimeoutSell([u8; 32], [u8; 16], BalanceOf<T>),
+        // A buy lock was created. \[order_id\], \[hashed_secret\], \[seller\], \[value\], \[timeout\]
+        LockBuy([u8; 16], [u8; 32], T::AccountId, BalanceOf<T>, T::Moment),
+        // A buy lock was unlocked. \[hashed_secret\], \[seller\], \[value\]
+        UnlockBuy([u8; 32], T::AccountId, BalanceOf<T>),
+        // A buy lock was timed out. \[hashed_secret\], \[buyer\], \[value\]
+        TimeoutBuy([u8; 32], T::AccountId, BalanceOf<T>),
 	}
 
 	/// Error for the nicks module.
