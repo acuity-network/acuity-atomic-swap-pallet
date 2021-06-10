@@ -1,6 +1,6 @@
-use crate as pallet_template;
+use crate as pallet_acuity_atomic_swap;
 use sp_core::H256;
-use frame_support::parameter_types;
+use frame_support::{parameter_types, PalletId};
 use sp_runtime::{
 	traits::{BlakeTwo256, IdentityLookup}, testing::Header,
 };
@@ -9,6 +9,12 @@ use frame_system as system;
 type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
 type Block = frame_system::mocking::MockBlock<Test>;
 
+/// Type used for expressing timestamp.
+pub type Moment = u64;
+
+/// Balance of an account.
+pub type Balance = u128;
+
 // Configure a mock runtime to test the pallet.
 frame_support::construct_runtime!(
 	pub enum Test where
@@ -16,8 +22,10 @@ frame_support::construct_runtime!(
 		NodeBlock = Block,
 		UncheckedExtrinsic = UncheckedExtrinsic,
 	{
-		System: frame_system::{Module, Call, Config, Storage, Event<T>},
-		TemplateModule: pallet_template::{Module, Call, Storage, Event<T>},
+		System: frame_system::{Pallet, Call, Config, Storage, Event<T>},
+        Timestamp: pallet_timestamp::{Pallet, Call, Storage, Inherent},
+        Balances: pallet_balances::{Pallet, Call, Storage, Event<T>},
+		AcuityAtomicSwap: pallet_acuity_atomic_swap::{Pallet, Call, Storage, Event<T>},
 	}
 );
 
@@ -44,15 +52,39 @@ impl system::Config for Test {
 	type BlockHashCount = BlockHashCount;
 	type Version = ();
 	type PalletInfo = PalletInfo;
-	type AccountData = ();
+    type AccountData = pallet_balances::AccountData<Balance>;
 	type OnNewAccount = ();
 	type OnKilledAccount = ();
 	type SystemWeightInfo = ();
 	type SS58Prefix = SS58Prefix;
+    type OnSetCode = ();
 }
 
-impl pallet_template::Config for Test {
+impl pallet_timestamp::Config for Test {
+	type Moment = Moment;
+	type OnTimestampSet = ();
+	type MinimumPeriod = ();
+	type WeightInfo = pallet_timestamp::weights::SubstrateWeight<Test>;
+}
+
+impl pallet_balances::Config for Test {
+	type MaxLocks = ();
+	type Balance = Balance;
+	type DustRemoval = ();
 	type Event = Event;
+	type ExistentialDeposit = ();
+	type AccountStore = frame_system::Pallet<Test>;
+	type WeightInfo = pallet_balances::weights::SubstrateWeight<Test>;
+}
+
+parameter_types! {
+	pub const AtomicSwapPalletId: PalletId = PalletId(*b"py/trsry");
+}
+
+impl pallet_acuity_atomic_swap::Config for Test {
+	type Event = Event;
+    type PalletId = AtomicSwapPalletId;
+    type Currency = Balances;
 }
 
 // Build genesis storage according to the mock runtime.

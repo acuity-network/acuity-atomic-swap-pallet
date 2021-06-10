@@ -29,6 +29,7 @@ pallet-timestamp = { default-features = false, git = 'https://github.com/parityt
 [dev-dependencies]
 serde = { version = "1.0.119" }
 sp-core = { default-features = false, git = 'https://github.com/paritytech/substrate', branch = "polkadot-v0.9.3", version = '3.0.0' }
+pallet-balances = { default-features = false, git = 'https://github.com/paritytech/substrate', branch = "polkadot-v0.9.3", version = '3.0.0' }
 
 [features]
 default = ['std']
