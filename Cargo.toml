@@ -14,7 +14,6 @@ targets = ['x86_64-unknown-linux-gnu']
 # alias "parity-scale-code" to "codec"
 [dependencies.codec]
 default-features = false
-features = ['derive']
 package = 'parity-scale-codec'
 version = '2.0.0'
 
@@ -24,12 +23,12 @@ frame-system = { default-features = false, git = 'https://github.com/paritytech/
 sp-std = { default-features = false, git = 'https://github.com/paritytech/substrate', branch = "polkadot-v0.9.3", version = '3.0.0' }
 sp-runtime = { default-features = false, git = 'https://github.com/paritytech/substrate', branch = "polkadot-v0.9.3", version = '3.0.0' }
 sp-io = { default-features = false, git = 'https://github.com/paritytech/substrate', branch = "polkadot-v0.9.3", version = '3.0.0' }
+sp-core = { default-features = false, git = 'https://github.com/paritytech/substrate', branch = "polkadot-v0.9.3", version = '3.0.0' }
 pallet-timestamp = { default-features = false, git = 'https://github.com/paritytech/substrate', branch = "polkadot-v0.9.3", version = '3.0.0' }
+pallet-balances = { default-features = false, git = 'https://github.com/paritytech/substrate', branch = "polkadot-v0.9.3", version = '3.0.0' }
 
 [dev-dependencies]
 serde = { version = "1.0.119" }
-sp-core = { default-features = false, git = 'https://github.com/paritytech/substrate', branch = "polkadot-v0.9.3", version = '3.0.0' }
-pallet-balances = { default-features = false, git = 'https://github.com/paritytech/substrate', branch = "polkadot-v0.9.3", version = '3.0.0' }
 
 [features]
 default = ['std']
@@ -40,5 +39,7 @@ std = [
     'sp-std/std',
     'sp-runtime/std',
     'sp-io/std',
+    "sp-core/std",
     'pallet-timestamp/std',
+    'pallet-balances/std',
 ]

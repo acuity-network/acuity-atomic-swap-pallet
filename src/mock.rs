@@ -1,3 +1,6 @@
+#![cfg(test)]
+
+use super::*;
 use crate as pallet_acuity_atomic_swap;
 use sp_core::H256;
 use frame_support::{parameter_types, PalletId};
@@ -24,8 +27,8 @@ frame_support::construct_runtime!(
 	{
 		System: frame_system::{Pallet, Call, Config, Storage, Event<T>},
         Timestamp: pallet_timestamp::{Pallet, Call, Storage, Inherent},
-        Balances: pallet_balances::{Pallet, Call, Storage, Event<T>},
-		AcuityAtomicSwap: pallet_acuity_atomic_swap::{Pallet, Call, Storage, Event<T>},
+        Balances: pallet_balances::{Pallet, Call, Storage, Config<T>, Event<T>},
+		AcuityAtomicSwap: pallet_acuity_atomic_swap::{Pallet, Call, Event<T>},
 	}
 );
 
@@ -67,13 +70,17 @@ impl pallet_timestamp::Config for Test {
 	type WeightInfo = pallet_timestamp::weights::SubstrateWeight<Test>;
 }
 
+parameter_types! {
+	pub const ExistentialDeposit: u64 = 1;
+}
+
 impl pallet_balances::Config for Test {
 	type MaxLocks = ();
 	type Balance = Balance;
 	type DustRemoval = ();
 	type Event = Event;
-	type ExistentialDeposit = ();
-	type AccountStore = frame_system::Pallet<Test>;
+	type ExistentialDeposit = ExistentialDeposit;
+	type AccountStore = System;
 	type WeightInfo = pallet_balances::weights::SubstrateWeight<Test>;
 }
 
@@ -81,13 +88,23 @@ parameter_types! {
 	pub const AtomicSwapPalletId: PalletId = PalletId(*b"py/trsry");
 }
 
-impl pallet_acuity_atomic_swap::Config for Test {
+impl Config for Test {
 	type Event = Event;
     type PalletId = AtomicSwapPalletId;
     type Currency = Balances;
 }
 
-// Build genesis storage according to the mock runtime.
+const A: u64 = 1;
+const B: u64 = 2;
+
 pub fn new_test_ext() -> sp_io::TestExternalities {
-	system::GenesisConfig::default().build_storage::<Test>().unwrap().into()
+	let mut t = frame_system::GenesisConfig::default().build_storage::<Test>().unwrap();
+	let genesis = pallet_balances::GenesisConfig::<Test> {
+		balances: vec![
+			(A, 100),
+			(B, 200),
+		],
+	};
+	genesis.assimilate_storage(&mut t).unwrap();
+	t.into()
 }
