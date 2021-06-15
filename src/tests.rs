@@ -130,7 +130,6 @@ fn lock_sell() {
         assert_eq!(lock.order_id, order_id);
         assert_eq!(lock.value, 10);
         assert_eq!(lock.timeout, 0);
-
 	});
 }
 
@@ -295,6 +294,41 @@ fn timeout_sell() {
         assert_eq!(Balances::free_balance(A), 50);
         assert_eq!(Balances::free_balance(B), 200);
         assert_eq!(Balances::free_balance(AcuityAtomicSwap::fund_account_id()), 50);
+	});
+}
 
+#[test]
+fn lock_buy_order_control_already_in_use() {
+    new_test_ext().execute_with(|| {
+        let _now = <pallet_timestamp::Pallet<Test>>::get();
+        assert_ok!(AcuityAtomicSwap::lock_buy(Origin::signed(B), [0; 32], A, _now + 1000, 50, [0; 16]));
+        assert_ok!(AcuityAtomicSwap::lock_buy(Origin::signed(B), [1; 32], A, _now + 1000, 50, [0; 16]));
+	});
+}
+
+#[test]
+fn lock_buy_order_fail_already_in_use() {
+    new_test_ext().execute_with(|| {
+        let _now = <pallet_timestamp::Pallet<Test>>::get();
+        assert_ok!(AcuityAtomicSwap::lock_buy(Origin::signed(B), [0; 32], A, _now + 1000, 50, [0; 16]));
+		assert_noop!(
+            AcuityAtomicSwap::lock_buy(Origin::signed(B), [0; 32], A, _now + 1000, 50, [0; 16]),
+			Error::<Test>::HashedSecretAlreadyInUse
+		);
+	});
+}
+
+#[test]
+fn lock_buy() {
+	new_test_ext().execute_with(|| {
+        let secret = [0; 32];
+        let hashed_secret: [u8; 32] = keccak_256(&secret);
+        let _now = <pallet_timestamp::Pallet<Test>>::get();
+        assert_ok!(AcuityAtomicSwap::lock_buy(Origin::signed(B), hashed_secret, A, _now + 1000, 50, [0; 16]));
+
+        let lock = AcuityAtomicSwap::buy_lock(hashed_secret);
+        assert_eq!(lock.seller, A);
+        assert_eq!(lock.value, 50);
+        assert_eq!(lock.timeout, _now + 1000);
 	});
 }

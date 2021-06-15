@@ -41,9 +41,9 @@ pub mod pallet {
 
     #[derive(Encode, Decode, Default, Clone, PartialEq)]
     pub struct BuyLock<AccountId, Balance, Moment> {
-        seller: AccountId,
-        value: Balance,
-        timeout: Moment,
+        pub seller: AccountId,
+        pub value: Balance,
+        pub timeout: Moment,
     }
 
 	#[pallet::pallet]
