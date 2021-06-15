@@ -386,3 +386,57 @@ fn unlock_buy() {
         assert_eq!(lock.timeout, 0);
 	});
 }
+
+#[test]
+fn timeout_buy_control_not_timed_out() {
+    new_test_ext().execute_with(|| {
+        let secret = [0; 32];
+        let hashed_secret: [u8; 32] = keccak_256(&secret);
+        let _now = <pallet_timestamp::Pallet<Test>>::get();
+        assert_ok!(AcuityAtomicSwap::lock_buy(Origin::signed(B), hashed_secret, A, _now, 50, [0; 16]));
+        assert_ok!(AcuityAtomicSwap::timeout_buy(Origin::signed(B), secret));
+	});
+}
+
+#[test]
+fn timeout_buy_fail_not_timed_out() {
+    new_test_ext().execute_with(|| {
+        let secret = [0; 32];
+        let hashed_secret: [u8; 32] = keccak_256(&secret);
+        let _now = <pallet_timestamp::Pallet<Test>>::get();
+        assert_ok!(AcuityAtomicSwap::lock_buy(Origin::signed(B), hashed_secret, A, _now + 1000, 50, [0; 16]));
+		assert_noop!(
+            AcuityAtomicSwap::timeout_buy(Origin::signed(B), secret),
+			Error::<Test>::LockNotTimedOut
+		);
+	});
+}
+
+#[test]
+fn timeout_buy() {
+	new_test_ext().execute_with(|| {
+        let secret = [0; 32];
+        let hashed_secret: [u8; 32] = keccak_256(&secret);
+        let _now = <pallet_timestamp::Pallet<Test>>::get();
+        assert_ok!(AcuityAtomicSwap::lock_buy(Origin::signed(B), hashed_secret, A, _now, 50, [0; 16]));
+
+        assert_eq!(Balances::free_balance(A), 100);
+        assert_eq!(Balances::free_balance(B), 150);
+        assert_eq!(Balances::free_balance(AcuityAtomicSwap::fund_account_id()), 50);
+
+        let lock = AcuityAtomicSwap::buy_lock(hashed_secret);
+        assert_eq!(lock.seller, A);
+        assert_eq!(lock.value, 50);
+        assert_eq!(lock.timeout, _now);
+
+        assert_ok!(AcuityAtomicSwap::timeout_buy(Origin::signed(B), secret));
+
+        assert_eq!(Balances::free_balance(A), 100);
+        assert_eq!(Balances::free_balance(B), 200);
+        assert_eq!(Balances::free_balance(AcuityAtomicSwap::fund_account_id()), 0);
+
+        let lock = AcuityAtomicSwap::buy_lock(hashed_secret);
+        assert_eq!(lock.value, 0);
+        assert_eq!(lock.timeout, 0);
+	});
+}
