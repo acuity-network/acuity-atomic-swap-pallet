@@ -67,7 +67,7 @@ fn remove_from_order() {
 }
 
 #[test]
-fn lock_sell_order_control_too_small() {
+fn lock_sell_control_too_small() {
     new_test_ext().execute_with(|| {
         let price: u128 = 5;
         assert_ok!(AcuityAtomicSwap::add_to_order(Origin::signed(A), price, 50));
@@ -76,7 +76,7 @@ fn lock_sell_order_control_too_small() {
 }
 
 #[test]
-fn lock_sell_order_fail_too_small() {
+fn lock_sell_fail_too_small() {
     new_test_ext().execute_with(|| {
         let price: u128 = 5;
         assert_ok!(AcuityAtomicSwap::add_to_order(Origin::signed(A), price, 50));
@@ -88,7 +88,7 @@ fn lock_sell_order_fail_too_small() {
 }
 
 #[test]
-fn lock_sell_order_control_already_in_use() {
+fn lock_sell_control_already_in_use() {
     new_test_ext().execute_with(|| {
         let price: u128 = 5;
         assert_ok!(AcuityAtomicSwap::add_to_order(Origin::signed(A), price, 50));
@@ -98,7 +98,7 @@ fn lock_sell_order_control_already_in_use() {
 }
 
 #[test]
-fn lock_sell_order_fail_already_in_use() {
+fn lock_sell_fail_already_in_use() {
     new_test_ext().execute_with(|| {
         let price: u128 = 5;
         assert_ok!(AcuityAtomicSwap::add_to_order(Origin::signed(A), price, 50));
@@ -134,7 +134,7 @@ fn lock_sell() {
 }
 
 #[test]
-fn unlock_sell_order_control_timed_out() {
+fn unlock_sell_control_timed_out() {
     new_test_ext().execute_with(|| {
         let price: u128 = 5;
         let secret = [0; 32];
@@ -147,7 +147,7 @@ fn unlock_sell_order_control_timed_out() {
 }
 
 #[test]
-fn unlock_sell_order_fail_timed_out() {
+fn unlock_sell_fail_timed_out() {
     new_test_ext().execute_with(|| {
         let price: u128 = 5;
         let secret = [0; 32];
@@ -202,7 +202,7 @@ fn unlock_sell() {
 }
 
 #[test]
-fn timeout_sell_order_control_wrong_order_id() {
+fn timeout_sell_control_wrong_order_id() {
     new_test_ext().execute_with(|| {
         let price: u128 = 5;
         let secret = [0; 32];
@@ -215,7 +215,7 @@ fn timeout_sell_order_control_wrong_order_id() {
 }
 
 #[test]
-fn timeout_sell_order_fail_wrong_order_id() {
+fn timeout_sell_fail_wrong_order_id() {
     new_test_ext().execute_with(|| {
         let price: u128 = 5;
         let secret = [0; 32];
@@ -231,7 +231,7 @@ fn timeout_sell_order_fail_wrong_order_id() {
 }
 
 #[test]
-fn timeout_sell_order_control_not_timed_out() {
+fn timeout_sell_control_not_timed_out() {
     new_test_ext().execute_with(|| {
         let price: u128 = 5;
         let secret = [0; 32];
@@ -244,7 +244,7 @@ fn timeout_sell_order_control_not_timed_out() {
 }
 
 #[test]
-fn timeout_sell_order_fail_not_timed_out() {
+fn timeout_sell_fail_not_timed_out() {
     new_test_ext().execute_with(|| {
         let price: u128 = 5;
         let secret = [0; 32];
@@ -298,7 +298,7 @@ fn timeout_sell() {
 }
 
 #[test]
-fn lock_buy_order_control_already_in_use() {
+fn lock_buy_control_already_in_use() {
     new_test_ext().execute_with(|| {
         let _now = <pallet_timestamp::Pallet<Test>>::get();
         assert_ok!(AcuityAtomicSwap::lock_buy(Origin::signed(B), [0; 32], A, _now + 1000, 50, [0; 16]));
@@ -307,7 +307,7 @@ fn lock_buy_order_control_already_in_use() {
 }
 
 #[test]
-fn lock_buy_order_fail_already_in_use() {
+fn lock_buy_fail_already_in_use() {
     new_test_ext().execute_with(|| {
         let _now = <pallet_timestamp::Pallet<Test>>::get();
         assert_ok!(AcuityAtomicSwap::lock_buy(Origin::signed(B), [0; 32], A, _now + 1000, 50, [0; 16]));
@@ -330,5 +330,59 @@ fn lock_buy() {
         assert_eq!(lock.seller, A);
         assert_eq!(lock.value, 50);
         assert_eq!(lock.timeout, _now + 1000);
+	});
+}
+
+#[test]
+fn unlock_buy_control_timed_out() {
+    new_test_ext().execute_with(|| {
+        let secret = [0; 32];
+        let hashed_secret: [u8; 32] = keccak_256(&secret);
+        let _now = <pallet_timestamp::Pallet<Test>>::get();
+        assert_ok!(AcuityAtomicSwap::lock_buy(Origin::signed(B), hashed_secret, A, _now + 1000, 50, [0; 16]));
+        assert_ok!(AcuityAtomicSwap::unlock_buy(Origin::signed(A), secret));
+	});
+}
+
+#[test]
+fn unlock_buy_fail_timed_out() {
+    new_test_ext().execute_with(|| {
+        let secret = [0; 32];
+        let hashed_secret: [u8; 32] = keccak_256(&secret);
+        let _now = <pallet_timestamp::Pallet<Test>>::get();
+        assert_ok!(AcuityAtomicSwap::lock_buy(Origin::signed(B), hashed_secret, A, _now, 50, [0; 16]));
+		assert_noop!(
+            AcuityAtomicSwap::unlock_buy(Origin::signed(A), secret),
+			Error::<Test>::LockTimedOut
+		);
+	});
+}
+
+#[test]
+fn unlock_buy() {
+	new_test_ext().execute_with(|| {
+        let secret = [0; 32];
+        let hashed_secret: [u8; 32] = keccak_256(&secret);
+        let _now = <pallet_timestamp::Pallet<Test>>::get();
+        assert_ok!(AcuityAtomicSwap::lock_buy(Origin::signed(B), hashed_secret, A, _now + 1000, 50, [0; 16]));
+
+        assert_eq!(Balances::free_balance(A), 100);
+        assert_eq!(Balances::free_balance(B), 150);
+        assert_eq!(Balances::free_balance(AcuityAtomicSwap::fund_account_id()), 50);
+
+        let lock = AcuityAtomicSwap::buy_lock(hashed_secret);
+        assert_eq!(lock.seller, A);
+        assert_eq!(lock.value, 50);
+        assert_eq!(lock.timeout, _now + 1000);
+
+        assert_ok!(AcuityAtomicSwap::unlock_buy(Origin::signed(A), secret));
+
+        assert_eq!(Balances::free_balance(A), 150);
+        assert_eq!(Balances::free_balance(B), 150);
+        assert_eq!(Balances::free_balance(AcuityAtomicSwap::fund_account_id()), 0);
+
+        let lock = AcuityAtomicSwap::buy_lock(hashed_secret);
+        assert_eq!(lock.value, 0);
+        assert_eq!(lock.timeout, 0);
 	});
 }
