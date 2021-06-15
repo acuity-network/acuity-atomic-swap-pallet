@@ -25,6 +25,27 @@ fn add_to_order() {
 }
 
 #[test]
+fn remove_from_order() {
+	new_test_ext().execute_with(|| {
+        let price: u128 = 5;
+		assert_ok!(AcuityAtomicSwap::add_to_order(Origin::signed(A), price, 50));
+
+        assert_eq!(Balances::free_balance(A), 50);
+        assert_eq!(Balances::free_balance(AcuityAtomicSwap::fund_account_id()), 50);
+
+        let order_id: [u8; 16] = blake2_128(&[A.to_ne_bytes().to_vec(), price.to_ne_bytes().to_vec()].concat());
+
+        assert_eq!(AcuityAtomicSwap::order_id_value(order_id), 50);
+
+        assert_ok!(AcuityAtomicSwap::remove_from_order(Origin::signed(A), price, 50));
+        assert_eq!(Balances::free_balance(A), 100);
+        assert_eq!(Balances::free_balance(AcuityAtomicSwap::fund_account_id()), 0);
+        assert_eq!(AcuityAtomicSwap::order_id_value(order_id), 0);
+
+	});
+}
+
+#[test]
 fn correct_error_for_none_value() {
 	new_test_ext().execute_with(|| {
 		// Ensure the expected error is thrown when no value is present.

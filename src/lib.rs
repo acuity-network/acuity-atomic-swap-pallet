@@ -90,7 +90,7 @@ pub mod pallet {
             let order_id: [u8; 16] = blake2_128(&[sender.encode(), price.to_ne_bytes().to_vec()].concat());
             // Check there is enough.
             let order_total = <OrderIdValues<T>>::get(order_id);
-            frame_support::ensure!(value < order_total, Error::<T>::OrderTooSmall);
+            frame_support::ensure!(value <= order_total, Error::<T>::OrderTooSmall);
             // Move the value from the pallet to the sender.
             T::Currency::transfer(&Self::fund_account_id(), &sender, value, AllowDeath)
             				.map_err(|_| DispatchError::Other("Can't transfer value."))?;
