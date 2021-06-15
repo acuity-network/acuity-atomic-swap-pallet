@@ -34,9 +34,9 @@ pub mod pallet {
 
     #[derive(Encode, Decode, Default, Clone, PartialEq)]
     pub struct SellLock<Balance, Moment> {
-        order_id: [u8; 16],
-        value: Balance,
-        timeout: Moment,
+        pub order_id: [u8; 16],
+        pub value: Balance,
+        pub timeout: Moment,
     }
 
     #[derive(Encode, Decode, Default, Clone, PartialEq)]
@@ -107,7 +107,10 @@ pub mod pallet {
             let order_id: [u8; 16] = blake2_128(&[sender.encode(), price.to_ne_bytes().to_vec()].concat());
             // Check there is enough.
             let order_total = <OrderIdValues<T>>::get(order_id);
-            frame_support::ensure!(value < order_total, Error::<T>::OrderTooSmall);
+            frame_support::ensure!(value <= order_total, Error::<T>::OrderTooSmall);
+            // Ensure hashed secret is not already in use.
+            let lock = <SellLocks<T>>::get(hashed_secret);
+            frame_support::ensure!(TryInto::<u64>::try_into(lock.value).ok() == Some(0), Error::<T>::HashedSecretAlreadyInUse);
             // Move value into sell lock.
             <OrderIdValues<T>>::insert(order_id, order_total - value);
 
