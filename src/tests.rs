@@ -1,6 +1,6 @@
 use crate::{Error, mock::*};
 use frame_support::{assert_ok, assert_noop};
-use sp_io::hashing::{blake2_128, keccak_256};
+use sp_io::hashing::{keccak_256};
 
 
 
@@ -12,12 +12,12 @@ const B: u64 = 2;
 fn add_to_order() {
 	new_test_ext().execute_with(|| {
         let price: u128 = 5;
-		assert_ok!(AcuityAtomicSwap::add_to_order(Origin::signed(A), price, 50));
+		assert_ok!(AcuityAtomicSwap::add_to_order(Origin::signed(A), [0; 16], price, 50));
 
         assert_eq!(Balances::free_balance(A), 50);
         assert_eq!(Balances::free_balance(AcuityAtomicSwap::fund_account_id()), 50);
 
-        let order_id: [u8; 16] = blake2_128(&[A.to_ne_bytes().to_vec(), price.to_ne_bytes().to_vec()].concat());
+        let order_id: [u8; 16] = AcuityAtomicSwap::get_order_id(A, [0; 16], price);
 
         assert_eq!(AcuityAtomicSwap::order_id_value(order_id), 50);
 
@@ -28,8 +28,8 @@ fn add_to_order() {
 fn remove_from_order_control_order_to_small() {
 	new_test_ext().execute_with(|| {
         let price: u128 = 5;
-        assert_ok!(AcuityAtomicSwap::add_to_order(Origin::signed(A), price, 50));
-        assert_ok!(AcuityAtomicSwap::add_to_order(Origin::signed(A), price, 50));
+        assert_ok!(AcuityAtomicSwap::add_to_order(Origin::signed(A), [0; 16], price, 50));
+        assert_ok!(AcuityAtomicSwap::remove_from_order(Origin::signed(A), [0; 16], price, 50));
 	});
 }
 
@@ -37,9 +37,9 @@ fn remove_from_order_control_order_to_small() {
 fn remove_from_order_fail_order_to_small() {
 	new_test_ext().execute_with(|| {
         let price: u128 = 5;
-        assert_ok!(AcuityAtomicSwap::add_to_order(Origin::signed(A), price, 50));
+        assert_ok!(AcuityAtomicSwap::add_to_order(Origin::signed(A), [0; 16], price, 50));
 		assert_noop!(
-            AcuityAtomicSwap::remove_from_order(Origin::signed(A), price, 51),
+            AcuityAtomicSwap::remove_from_order(Origin::signed(A), [0; 16], price, 51),
 			Error::<Test>::OrderTooSmall
 		);
 	});
@@ -49,16 +49,16 @@ fn remove_from_order_fail_order_to_small() {
 fn remove_from_order() {
 	new_test_ext().execute_with(|| {
         let price: u128 = 5;
-		assert_ok!(AcuityAtomicSwap::add_to_order(Origin::signed(A), price, 50));
+		assert_ok!(AcuityAtomicSwap::add_to_order(Origin::signed(A), [0; 16], price, 50));
 
         assert_eq!(Balances::free_balance(A), 50);
         assert_eq!(Balances::free_balance(AcuityAtomicSwap::fund_account_id()), 50);
 
-        let order_id: [u8; 16] = blake2_128(&[A.to_ne_bytes().to_vec(), price.to_ne_bytes().to_vec()].concat());
+        let order_id: [u8; 16] = AcuityAtomicSwap::get_order_id(A, [0; 16], price);
 
         assert_eq!(AcuityAtomicSwap::order_id_value(order_id), 50);
 
-        assert_ok!(AcuityAtomicSwap::remove_from_order(Origin::signed(A), price, 50));
+        assert_ok!(AcuityAtomicSwap::remove_from_order(Origin::signed(A), [0; 16], price, 50));
         assert_eq!(Balances::free_balance(A), 100);
         assert_eq!(Balances::free_balance(AcuityAtomicSwap::fund_account_id()), 0);
         assert_eq!(AcuityAtomicSwap::order_id_value(order_id), 0);
@@ -70,8 +70,8 @@ fn remove_from_order() {
 fn lock_sell_control_too_small() {
     new_test_ext().execute_with(|| {
         let price: u128 = 5;
-        assert_ok!(AcuityAtomicSwap::add_to_order(Origin::signed(A), price, 50));
-        assert_ok!(AcuityAtomicSwap::lock_sell(Origin::signed(A), price, [0; 32], 0, 50));
+        assert_ok!(AcuityAtomicSwap::add_to_order(Origin::signed(A), [0; 16], price, 50));
+        assert_ok!(AcuityAtomicSwap::lock_sell(Origin::signed(A), [0; 32], [0; 16], price, 50, 0));
 	});
 }
 
@@ -79,9 +79,9 @@ fn lock_sell_control_too_small() {
 fn lock_sell_fail_too_small() {
     new_test_ext().execute_with(|| {
         let price: u128 = 5;
-        assert_ok!(AcuityAtomicSwap::add_to_order(Origin::signed(A), price, 50));
+        assert_ok!(AcuityAtomicSwap::add_to_order(Origin::signed(A), [0; 16], price, 50));
 		assert_noop!(
-            AcuityAtomicSwap::lock_sell(Origin::signed(A), price, [0; 32], 0, 60),
+            AcuityAtomicSwap::lock_sell(Origin::signed(A), [0; 32], [0; 16], price, 60, 0),
 			Error::<Test>::OrderTooSmall
 		);
 	});
@@ -91,9 +91,9 @@ fn lock_sell_fail_too_small() {
 fn lock_sell_control_already_in_use() {
     new_test_ext().execute_with(|| {
         let price: u128 = 5;
-        assert_ok!(AcuityAtomicSwap::add_to_order(Origin::signed(A), price, 50));
-        assert_ok!(AcuityAtomicSwap::lock_sell(Origin::signed(A), price, [0; 32], 0, 10));
-        assert_ok!(AcuityAtomicSwap::lock_sell(Origin::signed(A), price, [1; 32], 0, 10));
+        assert_ok!(AcuityAtomicSwap::add_to_order(Origin::signed(A), [0; 16], price, 50));
+        assert_ok!(AcuityAtomicSwap::lock_sell(Origin::signed(A), [0; 32], [0; 16], price, 10, 0));
+        assert_ok!(AcuityAtomicSwap::lock_sell(Origin::signed(A), [1; 32], [0; 16], price, 10, 0));
 	});
 }
 
@@ -101,10 +101,10 @@ fn lock_sell_control_already_in_use() {
 fn lock_sell_fail_already_in_use() {
     new_test_ext().execute_with(|| {
         let price: u128 = 5;
-        assert_ok!(AcuityAtomicSwap::add_to_order(Origin::signed(A), price, 50));
-        assert_ok!(AcuityAtomicSwap::lock_sell(Origin::signed(A), price, [0; 32], 0, 10));
+        assert_ok!(AcuityAtomicSwap::add_to_order(Origin::signed(A), [0; 16], price, 50));
+        assert_ok!(AcuityAtomicSwap::lock_sell(Origin::signed(A), [0; 32], [0; 16], price, 10, 0));
 		assert_noop!(
-            AcuityAtomicSwap::lock_sell(Origin::signed(A), price, [0; 32], 0, 10),
+            AcuityAtomicSwap::lock_sell(Origin::signed(A), [0; 32], [0; 16], price, 10, 0),
 			Error::<Test>::HashedSecretAlreadyInUse
 		);
 	});
@@ -114,16 +114,16 @@ fn lock_sell_fail_already_in_use() {
 fn lock_sell() {
 	new_test_ext().execute_with(|| {
         let price: u128 = 5;
-		assert_ok!(AcuityAtomicSwap::add_to_order(Origin::signed(A), price, 50));
+		assert_ok!(AcuityAtomicSwap::add_to_order(Origin::signed(A), [0; 16], price, 50));
 
         assert_eq!(Balances::free_balance(A), 50);
         assert_eq!(Balances::free_balance(AcuityAtomicSwap::fund_account_id()), 50);
 
-        let order_id: [u8; 16] = blake2_128(&[A.to_ne_bytes().to_vec(), price.to_ne_bytes().to_vec()].concat());
+        let order_id: [u8; 16] = AcuityAtomicSwap::get_order_id(A, [0; 16], price);
 
         assert_eq!(AcuityAtomicSwap::order_id_value(order_id), 50);
 
-        assert_ok!(AcuityAtomicSwap::lock_sell(Origin::signed(A), price, [0; 32], 0, 10));
+        assert_ok!(AcuityAtomicSwap::lock_sell(Origin::signed(A), [0; 32], [0; 16], price, 10, 0));
         assert_eq!(AcuityAtomicSwap::order_id_value(order_id), 40);
 
         let lock = AcuityAtomicSwap::sell_lock([0; 32]);
@@ -140,8 +140,8 @@ fn unlock_sell_control_timed_out() {
         let secret = [0; 32];
         let hashed_secret: [u8; 32] = keccak_256(&secret);
         let _now = <pallet_timestamp::Pallet<Test>>::get();
-		assert_ok!(AcuityAtomicSwap::add_to_order(Origin::signed(A), price, 50));
-        assert_ok!(AcuityAtomicSwap::lock_sell(Origin::signed(A), price, hashed_secret, _now + 1000, 10));
+        assert_ok!(AcuityAtomicSwap::add_to_order(Origin::signed(A), [0; 16], price, 50));
+        assert_ok!(AcuityAtomicSwap::lock_sell(Origin::signed(A), hashed_secret, [0; 16], price, 10, _now + 1000));
         assert_ok!(AcuityAtomicSwap::unlock_sell(Origin::signed(B), secret));
 	});
 }
@@ -153,8 +153,8 @@ fn unlock_sell_fail_timed_out() {
         let secret = [0; 32];
         let hashed_secret: [u8; 32] = keccak_256(&secret);
         let _now = <pallet_timestamp::Pallet<Test>>::get();
-		assert_ok!(AcuityAtomicSwap::add_to_order(Origin::signed(A), price, 50));
-        assert_ok!(AcuityAtomicSwap::lock_sell(Origin::signed(A), price, hashed_secret, _now, 10));
+		assert_ok!(AcuityAtomicSwap::add_to_order(Origin::signed(A), [0; 16], price, 50));
+        assert_ok!(AcuityAtomicSwap::lock_sell(Origin::signed(A), hashed_secret, [0; 16], price, 10, _now));
 		assert_noop!(
             AcuityAtomicSwap::unlock_sell(Origin::signed(B), secret),
 			Error::<Test>::LockTimedOut
@@ -169,17 +169,17 @@ fn unlock_sell() {
         let secret = [0; 32];
         let hashed_secret: [u8; 32] = keccak_256(&secret);
         let _now = <pallet_timestamp::Pallet<Test>>::get();
-		assert_ok!(AcuityAtomicSwap::add_to_order(Origin::signed(A), price, 50));
+		assert_ok!(AcuityAtomicSwap::add_to_order(Origin::signed(A), [0; 16], price, 50));
 
         assert_eq!(Balances::free_balance(A), 50);
         assert_eq!(Balances::free_balance(B), 200);
         assert_eq!(Balances::free_balance(AcuityAtomicSwap::fund_account_id()), 50);
 
-        let order_id: [u8; 16] = blake2_128(&[A.to_ne_bytes().to_vec(), price.to_ne_bytes().to_vec()].concat());
+        let order_id: [u8; 16] = AcuityAtomicSwap::get_order_id(A, [0; 16], price);
 
         assert_eq!(AcuityAtomicSwap::order_id_value(order_id), 50);
 
-        assert_ok!(AcuityAtomicSwap::lock_sell(Origin::signed(A), price, hashed_secret, _now + 1000, 10));
+        assert_ok!(AcuityAtomicSwap::lock_sell(Origin::signed(A), hashed_secret, [0; 16], price, 10, _now + 1000));
         assert_eq!(AcuityAtomicSwap::order_id_value(order_id), 40);
 
         let lock = AcuityAtomicSwap::sell_lock(hashed_secret);
@@ -208,9 +208,9 @@ fn timeout_sell_control_wrong_order_id() {
         let secret = [0; 32];
         let hashed_secret: [u8; 32] = keccak_256(&secret);
         let _now = <pallet_timestamp::Pallet<Test>>::get();
-		assert_ok!(AcuityAtomicSwap::add_to_order(Origin::signed(A), price, 50));
-        assert_ok!(AcuityAtomicSwap::lock_sell(Origin::signed(A), price, hashed_secret, _now, 10));
-        assert_ok!(AcuityAtomicSwap::timeout_sell(Origin::signed(A), price, hashed_secret));
+        assert_ok!(AcuityAtomicSwap::add_to_order(Origin::signed(A), [0; 16], price, 50));
+        assert_ok!(AcuityAtomicSwap::lock_sell(Origin::signed(A), hashed_secret, [0; 16], price, 10, _now));
+        assert_ok!(AcuityAtomicSwap::timeout_sell(Origin::signed(A), hashed_secret, [0; 16], price));
 	});
 }
 
@@ -221,10 +221,10 @@ fn timeout_sell_fail_wrong_order_id() {
         let secret = [0; 32];
         let hashed_secret: [u8; 32] = keccak_256(&secret);
         let _now = <pallet_timestamp::Pallet<Test>>::get();
-		assert_ok!(AcuityAtomicSwap::add_to_order(Origin::signed(A), price, 50));
-        assert_ok!(AcuityAtomicSwap::lock_sell(Origin::signed(A), price, hashed_secret, _now, 10));
+        assert_ok!(AcuityAtomicSwap::add_to_order(Origin::signed(A), [0; 16], price, 50));
+        assert_ok!(AcuityAtomicSwap::lock_sell(Origin::signed(A), [0; 32], [0; 16], price, 10, _now));
 		assert_noop!(
-            AcuityAtomicSwap::timeout_sell(Origin::signed(A), price - 1, hashed_secret),
+            AcuityAtomicSwap::timeout_sell(Origin::signed(A), hashed_secret, [0; 16], price - 1),
 			Error::<Test>::WrongOrderId
 		);
 	});
@@ -237,9 +237,9 @@ fn timeout_sell_control_not_timed_out() {
         let secret = [0; 32];
         let hashed_secret: [u8; 32] = keccak_256(&secret);
         let _now = <pallet_timestamp::Pallet<Test>>::get();
-		assert_ok!(AcuityAtomicSwap::add_to_order(Origin::signed(A), price, 50));
-        assert_ok!(AcuityAtomicSwap::lock_sell(Origin::signed(A), price, hashed_secret, _now, 10));
-        assert_ok!(AcuityAtomicSwap::timeout_sell(Origin::signed(A), price, hashed_secret));
+		assert_ok!(AcuityAtomicSwap::add_to_order(Origin::signed(A), [0; 16], price, 50));
+        assert_ok!(AcuityAtomicSwap::lock_sell(Origin::signed(A), hashed_secret, [0; 16], price, 10, _now));
+        assert_ok!(AcuityAtomicSwap::timeout_sell(Origin::signed(A), hashed_secret, [0; 16], price));
 	});
 }
 
@@ -250,10 +250,10 @@ fn timeout_sell_fail_not_timed_out() {
         let secret = [0; 32];
         let hashed_secret: [u8; 32] = keccak_256(&secret);
         let _now = <pallet_timestamp::Pallet<Test>>::get();
-		assert_ok!(AcuityAtomicSwap::add_to_order(Origin::signed(A), price, 50));
-        assert_ok!(AcuityAtomicSwap::lock_sell(Origin::signed(A), price, hashed_secret, _now + 1000, 10));
+		assert_ok!(AcuityAtomicSwap::add_to_order(Origin::signed(A), [0; 16], price, 50));
+        assert_ok!(AcuityAtomicSwap::lock_sell(Origin::signed(A), hashed_secret, [0; 16], price, 10, _now + 1000));
 		assert_noop!(
-            AcuityAtomicSwap::timeout_sell(Origin::signed(A), price, hashed_secret),
+            AcuityAtomicSwap::timeout_sell(Origin::signed(A), hashed_secret, [0; 16], price),
 			Error::<Test>::LockNotTimedOut
 		);
 	});
@@ -266,17 +266,17 @@ fn timeout_sell() {
         let secret = [0; 32];
         let hashed_secret: [u8; 32] = keccak_256(&secret);
         let _now = <pallet_timestamp::Pallet<Test>>::get();
-		assert_ok!(AcuityAtomicSwap::add_to_order(Origin::signed(A), price, 50));
+		assert_ok!(AcuityAtomicSwap::add_to_order(Origin::signed(A), [0; 16], price, 50));
 
         assert_eq!(Balances::free_balance(A), 50);
         assert_eq!(Balances::free_balance(B), 200);
         assert_eq!(Balances::free_balance(AcuityAtomicSwap::fund_account_id()), 50);
 
-        let order_id: [u8; 16] = blake2_128(&[A.to_ne_bytes().to_vec(), price.to_ne_bytes().to_vec()].concat());
+        let order_id: [u8; 16] = AcuityAtomicSwap::get_order_id(A, [0; 16], price);
 
         assert_eq!(AcuityAtomicSwap::order_id_value(order_id), 50);
 
-        assert_ok!(AcuityAtomicSwap::lock_sell(Origin::signed(A), price, hashed_secret, _now, 10));
+        assert_ok!(AcuityAtomicSwap::lock_sell(Origin::signed(A), hashed_secret, [0; 16], price, 10, _now));
         assert_eq!(AcuityAtomicSwap::order_id_value(order_id), 40);
 
         let lock = AcuityAtomicSwap::sell_lock(hashed_secret);
@@ -284,7 +284,7 @@ fn timeout_sell() {
         assert_eq!(lock.value, 10);
         assert_eq!(lock.timeout, _now);
 
-        assert_ok!(AcuityAtomicSwap::timeout_sell(Origin::signed(A), price, hashed_secret));
+        assert_ok!(AcuityAtomicSwap::timeout_sell(Origin::signed(A), hashed_secret, [0; 16], price));
         assert_eq!(AcuityAtomicSwap::order_id_value(order_id), 50);
 
         let lock = AcuityAtomicSwap::sell_lock(hashed_secret);

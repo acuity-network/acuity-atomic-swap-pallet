@@ -16,6 +16,8 @@ use sp_std::{
 	convert::TryInto,
 };
 
+use codec::Encode;
+
 #[cfg(test)]
 mod mock;
 
@@ -64,30 +66,29 @@ pub mod pallet {
         type Currency: Currency<Self::AccountId>;
 	}
 
-
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
 
 		#[pallet::weight(50_000_000)]
-		pub(super) fn add_to_order(origin: OriginFor<T>, price: u128, value: BalanceOf<T>) -> DispatchResultWithPostInfo {
+		pub(super) fn add_to_order(origin: OriginFor<T>, asset_id: [u8; 16], price: u128, value: BalanceOf<T>) -> DispatchResultWithPostInfo {
             let sender = ensure_signed(origin)?;
             // Calculate order_id.
-            let order_id: [u8; 16] = blake2_128(&[sender.encode(), price.to_ne_bytes().to_vec()].concat());
+            let order_id: [u8; 16] = Self::get_order_id(sender.clone(), asset_id, price);
             // Move the value from the sender to the pallet.
             T::Currency::transfer(&sender, &Self::fund_account_id(), value, AllowDeath)
             				.map_err(|_| DispatchError::Other("Can't transfer value."))?;
             // Add value to order.
             let order_total = <OrderIdValues<T>>::get(order_id);
             <OrderIdValues<T>>::insert(order_id, order_total + value);
-            Self::deposit_event(Event::AddToOrder(sender, order_id, price, value));
+            Self::deposit_event(Event::AddToOrder(sender, asset_id, price, value));
 			Ok(().into())
 		}
 
         #[pallet::weight(50_000_000)]
-		pub(super) fn remove_from_order(origin: OriginFor<T>, price: u128, value: BalanceOf<T>) -> DispatchResultWithPostInfo {
+		pub(super) fn remove_from_order(origin: OriginFor<T>, asset_id: [u8; 16], price: u128, value: BalanceOf<T>) -> DispatchResultWithPostInfo {
             let sender = ensure_signed(origin)?;
             // Calculate order_id.
-            let order_id: [u8; 16] = blake2_128(&[sender.encode(), price.to_ne_bytes().to_vec()].concat());
+            let order_id: [u8; 16] = Self::get_order_id(sender.clone(), asset_id, price);
             // Check there is enough.
             let order_total = <OrderIdValues<T>>::get(order_id);
             frame_support::ensure!(value <= order_total, Error::<T>::OrderTooSmall);
@@ -96,15 +97,15 @@ pub mod pallet {
             				.map_err(|_| DispatchError::Other("Can't transfer value."))?;
             // Remove value from order.
             <OrderIdValues<T>>::insert(order_id, order_total - value);
-            Self::deposit_event(Event::RemoveFromOrder(sender, order_id, price, value));
+            Self::deposit_event(Event::RemoveFromOrder(sender, asset_id, price, value));
 			Ok(().into())
 		}
 
         #[pallet::weight(50_000_000)]
-		pub(super) fn lock_sell(origin: OriginFor<T>, price: u128, hashed_secret: [u8; 32], timeout: T::Moment, value: BalanceOf<T>) -> DispatchResultWithPostInfo {
+		pub(super) fn lock_sell(origin: OriginFor<T>, hashed_secret: [u8; 32], asset_id: [u8; 16], price: u128, value: BalanceOf<T>, timeout: T::Moment) -> DispatchResultWithPostInfo {
             let sender = ensure_signed(origin)?;
             // Calculate order_id.
-            let order_id: [u8; 16] = blake2_128(&[sender.encode(), price.to_ne_bytes().to_vec()].concat());
+            let order_id: [u8; 16] = Self::get_order_id(sender.clone(), asset_id, price);
             // Check there is enough.
             let order_total = <OrderIdValues<T>>::get(order_id);
             frame_support::ensure!(value <= order_total, Error::<T>::OrderTooSmall);
@@ -143,11 +144,11 @@ pub mod pallet {
 		}
 
         #[pallet::weight(50_000_000)]
-		pub(super) fn timeout_sell(origin: OriginFor<T>, price: u128, hashed_secret: [u8; 32]) -> DispatchResultWithPostInfo {
+		pub(super) fn timeout_sell(origin: OriginFor<T>, hashed_secret: [u8; 32], asset_id: [u8; 16], price: u128) -> DispatchResultWithPostInfo {
             let sender = ensure_signed(origin)?;
             let _now = <pallet_timestamp::Pallet<T>>::get();
             // Calculate order_id.
-            let order_id: [u8; 16] = blake2_128(&[sender.encode(), price.to_ne_bytes().to_vec()].concat());
+            let order_id: [u8; 16] = Self::get_order_id(sender.clone(), asset_id, price);
             // Check order_id is correct and lock has timed out.
             let lock = <SellLocks<T>>::get(hashed_secret);
             frame_support::ensure!(lock.order_id == order_id, Error::<T>::WrongOrderId);
@@ -222,9 +223,9 @@ pub mod pallet {
 	#[pallet::metadata(T::AccountId = "AccountId", BalanceOf<T> = "Value", T::Moment = "Timestamp")]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
-        // Value was added to a sell order. \[seller\], \[order_id\], \[price\], \[value\]
+        // Value was added to a sell order. \[seller\], \[asset_id\], \[price\], \[value\]
         AddToOrder(T::AccountId, [u8; 16], u128, BalanceOf<T>),
-        // Value was removed from a sell order. \[seller\], \[order_id\], \[price\], \[value\]
+        // Value was removed from a sell order. \[seller\], \[asset_id\], \[price\], \[value\]
         RemoveFromOrder(T::AccountId, [u8; 16], u128, BalanceOf<T>),
         // A sell lock was created. \[order_id\], \[hashed_secret\], \[seller\], \[value\], \[timeout\]
         LockSell([u8; 16], [u8; 32], T::AccountId, BalanceOf<T>, T::Moment),
@@ -276,4 +277,9 @@ impl<T: Config> Pallet<T> {
 	pub fn fund_account_id() -> T::AccountId {
 		T::PalletId::get().into_sub_account(0)
 	}
+
+    pub fn get_order_id(seller: T::AccountId, asset_id: [u8; 16], price: u128 ) -> [u8; 16] {
+        blake2_128(&[seller.encode(), asset_id.to_vec(), price.to_ne_bytes().to_vec()].concat())
+    }
+
 }
