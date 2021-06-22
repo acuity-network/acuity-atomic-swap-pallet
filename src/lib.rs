@@ -103,6 +103,23 @@ pub mod pallet {
 		}
 
         #[pallet::weight(50_000_000)]
+		pub(super) fn change_order_all(origin: OriginFor<T>, old_asset_id: [u8; 16], old_price: u128, new_asset_id: [u8; 16], new_price: u128) -> DispatchResultWithPostInfo {
+            let sender = ensure_signed(origin)?;
+            // Calculate order_ids.
+            let old_order_id: [u8; 16] = Self::get_order_id(sender.clone(), old_asset_id, old_price);
+            let new_order_id: [u8; 16] = Self::get_order_id(sender.clone(), new_asset_id, new_price);
+            // Transfer value.
+            let old_order_value = <OrderIdValues<T>>::get(old_order_id);
+            <OrderIdValues<T>>::remove(old_order_id);
+            let new_order_value = <OrderIdValues<T>>::get(new_order_id);
+            <OrderIdValues<T>>::insert(new_order_id, old_order_value + new_order_value);
+            // Log info.
+            Self::deposit_event(Event::RemoveFromOrder(sender.clone(), old_asset_id, old_price, old_order_value));
+            Self::deposit_event(Event::AddToOrder(sender, new_asset_id, new_price, new_order_value));
+			Ok(().into())
+		}
+
+        #[pallet::weight(50_000_000)]
 		pub(super) fn remove_from_order(origin: OriginFor<T>, asset_id: [u8; 16], price: u128, value: BalanceOf<T>) -> DispatchResultWithPostInfo {
             let sender = ensure_signed(origin)?;
             // Calculate order_id.
