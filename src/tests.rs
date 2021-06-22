@@ -134,6 +134,27 @@ fn remove_from_order() {
 }
 
 #[test]
+fn remove_from_order_all() {
+	new_test_ext().execute_with(|| {
+        let price: u128 = 5;
+		assert_ok!(AcuityAtomicSwap::add_to_order(Origin::signed(A), [0; 16], price, 50));
+
+        assert_eq!(Balances::free_balance(A), 50);
+        assert_eq!(Balances::free_balance(AcuityAtomicSwap::fund_account_id()), 50);
+
+        let order_id: [u8; 16] = AcuityAtomicSwap::get_order_id(A, [0; 16], price);
+
+        assert_eq!(AcuityAtomicSwap::order_id_value(order_id), 50);
+
+        assert_ok!(AcuityAtomicSwap::remove_from_order_all(Origin::signed(A), [0; 16], price));
+        assert_eq!(Balances::free_balance(A), 100);
+        assert_eq!(Balances::free_balance(AcuityAtomicSwap::fund_account_id()), 0);
+        assert_eq!(AcuityAtomicSwap::order_id_value(order_id), 0);
+
+	});
+}
+
+#[test]
 fn lock_sell_control_too_small() {
     new_test_ext().execute_with(|| {
         let price: u128 = 5;

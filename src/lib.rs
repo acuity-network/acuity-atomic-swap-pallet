@@ -137,6 +137,21 @@ pub mod pallet {
 		}
 
         #[pallet::weight(50_000_000)]
+		pub(super) fn remove_from_order_all(origin: OriginFor<T>, asset_id: [u8; 16], price: u128) -> DispatchResultWithPostInfo {
+            let sender = ensure_signed(origin)?;
+            // Calculate order_id.
+            let order_id: [u8; 16] = Self::get_order_id(sender.clone(), asset_id, price);
+            let value = <OrderIdValues<T>>::get(order_id);
+            // Move the value from the pallet to the sender.
+            T::Currency::transfer(&Self::fund_account_id(), &sender, value, AllowDeath)
+            				.map_err(|_| DispatchError::Other("Can't transfer value."))?;
+            // Remove value from order.
+            <OrderIdValues<T>>::remove(order_id);
+            Self::deposit_event(Event::RemoveFromOrder(sender, asset_id, price, value));
+			Ok(().into())
+		}
+
+        #[pallet::weight(50_000_000)]
 		pub(super) fn lock_sell(origin: OriginFor<T>, hashed_secret: [u8; 32], asset_id: [u8; 16], price: u128, value: BalanceOf<T>, timeout: T::Moment) -> DispatchResultWithPostInfo {
             let sender = ensure_signed(origin)?;
             // Calculate order_id.
