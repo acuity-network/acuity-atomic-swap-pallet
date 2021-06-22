@@ -171,7 +171,7 @@ pub mod pallet {
                 timeout: timeout,
             };
             <SellLocks<T>>::insert(hashed_secret, sell_lock);
-            Self::deposit_event(Event::LockSell(order_id, hashed_secret, sender, value, timeout));
+            Self::deposit_event(Event::LockSell(hashed_secret, order_id, value, timeout));
 			Ok(().into())
 		}
 
@@ -189,7 +189,7 @@ pub mod pallet {
             // Send the funds.
             T::Currency::transfer(&Self::fund_account_id(), &sender, lock.value, AllowDeath)
             				.map_err(|_| DispatchError::Other("Can't transfer value."))?;
-            Self::deposit_event(Event::UnlockSell(hashed_secret, sender, lock.value, secret));
+            Self::deposit_event(Event::UnlockSell(secret, sender));
 			Ok(().into())
 		}
 
@@ -208,12 +208,12 @@ pub mod pallet {
             // Return funds to sell order.
             let order_total = <OrderIdValues<T>>::get(order_id);
             <OrderIdValues<T>>::insert(order_id, order_total + lock.value);
-            Self::deposit_event(Event::TimeoutSell(hashed_secret, order_id, lock.value));
+            Self::deposit_event(Event::TimeoutSell(hashed_secret));
 			Ok(().into())
 		}
 
         #[pallet::weight(50_000_000)]
-		pub(super) fn lock_buy(origin: OriginFor<T>, hashed_secret: [u8; 32], seller: T::AccountId, timeout: T::Moment, value: BalanceOf<T>, order_id: [u8; 16]) -> DispatchResultWithPostInfo {
+		pub(super) fn lock_buy(origin: OriginFor<T>, hashed_secret: [u8; 32], asset_id: [u8; 16], order_id: [u8; 16], seller: T::AccountId, timeout: T::Moment, value: BalanceOf<T>, ) -> DispatchResultWithPostInfo {
             let sender = ensure_signed(origin)?;
             // Ensure hashed secret is not already in use.
             let lock = <BuyLocks<T>>::get(hashed_secret);
@@ -228,7 +228,7 @@ pub mod pallet {
                 timeout: timeout,
             };
             <BuyLocks<T>>::insert(hashed_secret, lock);
-            Self::deposit_event(Event::LockBuy(order_id, hashed_secret, seller, value, timeout));
+            Self::deposit_event(Event::LockBuy(hashed_secret, asset_id, order_id, seller, value, timeout));
 			Ok(().into())
 		}
 
@@ -246,7 +246,7 @@ pub mod pallet {
             // Send the funds.
             T::Currency::transfer(&Self::fund_account_id(), &lock.seller, lock.value, AllowDeath)
             				.map_err(|_| DispatchError::Other("Can't transfer value."))?;
-            Self::deposit_event(Event::UnlockBuy(hashed_secret, lock.seller, lock.value));
+            Self::deposit_event(Event::UnlockBuy(hashed_secret));
 			Ok(().into())
 		}
 
@@ -264,7 +264,7 @@ pub mod pallet {
             // Send the funds.
             T::Currency::transfer(&Self::fund_account_id(), &sender, lock.value, AllowDeath)
             				.map_err(|_| DispatchError::Other("Can't transfer value."))?;
-            Self::deposit_event(Event::TimeoutBuy(hashed_secret, sender, lock.value));
+            Self::deposit_event(Event::TimeoutBuy(hashed_secret));
 			Ok(().into())
 		}
 	}
@@ -277,18 +277,18 @@ pub mod pallet {
         AddToOrder(T::AccountId, [u8; 16], u128, BalanceOf<T>),
         // Value was removed from a sell order. \[seller\], \[asset_id\], \[price\], \[value\]
         RemoveFromOrder(T::AccountId, [u8; 16], u128, BalanceOf<T>),
-        // A sell lock was created. \[order_id\], \[hashed_secret\], \[seller\], \[value\], \[timeout\]
-        LockSell([u8; 16], [u8; 32], T::AccountId, BalanceOf<T>, T::Moment),
-        // A sell lock was unlocked \[hashed_secret\], \[buyer\], \[value\], \[secret\]
-        UnlockSell([u8; 32], T::AccountId, BalanceOf<T>, [u8; 32]),
-        // A sell lock was timed out. \[hashed_secret\], \[order_id\], \[value\]
-        TimeoutSell([u8; 32], [u8; 16], BalanceOf<T>),
+        // A sell lock was created. \[hashed_secret\], \[order_id\], \[value\], \[timeout\]
+        LockSell([u8; 32], [u8; 16], BalanceOf<T>, T::Moment),
+        // A sell lock was unlocked \[secret\], \[buyer\]
+        UnlockSell([u8; 32], T::AccountId),
+        // A sell lock was timed out. \[hashed_secret\]
+        TimeoutSell([u8; 32]),
         // A buy lock was created. \[order_id\], \[hashed_secret\], \[seller\], \[value\], \[timeout\]
-        LockBuy([u8; 16], [u8; 32], T::AccountId, BalanceOf<T>, T::Moment),
-        // A buy lock was unlocked. \[hashed_secret\], \[seller\], \[value\]
-        UnlockBuy([u8; 32], T::AccountId, BalanceOf<T>),
-        // A buy lock was timed out. \[hashed_secret\], \[buyer\], \[value\]
-        TimeoutBuy([u8; 32], T::AccountId, BalanceOf<T>),
+        LockBuy([u8; 32], [u8; 16], [u8; 16], T::AccountId, BalanceOf<T>, T::Moment),
+        // A buy lock was unlocked. \[hashed_secret\]
+        UnlockBuy([u8; 32]),
+        // A buy lock was timed out. \[hashed_secret\]
+        TimeoutBuy([u8; 32]),
 	}
 
 	/// Error for the nicks module.
