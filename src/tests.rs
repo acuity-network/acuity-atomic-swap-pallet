@@ -25,6 +25,50 @@ fn add_to_order() {
 }
 
 #[test]
+fn change_order_control_order_to_small() {
+	new_test_ext().execute_with(|| {
+        let price: u128 = 5;
+        assert_ok!(AcuityAtomicSwap::add_to_order(Origin::signed(A), [0; 16], price, 50));
+        assert_ok!(AcuityAtomicSwap::change_order(Origin::signed(A), [0; 16], price, [1; 16], price, 50));
+	});
+}
+
+#[test]
+fn change_order_fail_order_to_small() {
+	new_test_ext().execute_with(|| {
+        let price: u128 = 5;
+        assert_ok!(AcuityAtomicSwap::add_to_order(Origin::signed(A), [0; 16], price, 50));
+		assert_noop!(
+            AcuityAtomicSwap::change_order(Origin::signed(A), [0; 16], price, [1; 16], price, 51),
+			Error::<Test>::OrderTooSmall
+		);
+	});
+}
+
+#[test]
+fn change_from_order() {
+	new_test_ext().execute_with(|| {
+        let price: u128 = 5;
+		assert_ok!(AcuityAtomicSwap::add_to_order(Origin::signed(A), [0; 16], price, 50));
+
+        assert_eq!(Balances::free_balance(A), 50);
+        assert_eq!(Balances::free_balance(AcuityAtomicSwap::fund_account_id()), 50);
+
+        let order_id: [u8; 16] = AcuityAtomicSwap::get_order_id(A, [0; 16], price);
+
+        assert_eq!(AcuityAtomicSwap::order_id_value(order_id), 50);
+
+        assert_ok!(AcuityAtomicSwap::change_order(Origin::signed(A), [0; 16], price, [1; 16], price, 50));
+        assert_eq!(Balances::free_balance(A), 50);
+        assert_eq!(Balances::free_balance(AcuityAtomicSwap::fund_account_id()), 50);
+        assert_eq!(AcuityAtomicSwap::order_id_value(order_id), 0);
+
+        let new_order_id: [u8; 16] = AcuityAtomicSwap::get_order_id(A, [1; 16], price);
+        assert_eq!(AcuityAtomicSwap::order_id_value(new_order_id), 50);
+	});
+}
+
+#[test]
 fn remove_from_order_control_order_to_small() {
 	new_test_ext().execute_with(|| {
         let price: u128 = 5;

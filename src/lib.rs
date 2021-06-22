@@ -85,18 +85,36 @@ pub mod pallet {
 		}
 
         #[pallet::weight(50_000_000)]
+		pub(super) fn change_order(origin: OriginFor<T>, old_asset_id: [u8; 16], old_price: u128, new_asset_id: [u8; 16], new_price: u128, value: BalanceOf<T>) -> DispatchResultWithPostInfo {
+            let sender = ensure_signed(origin)?;
+            // Calculate order_ids.
+            let old_order_id: [u8; 16] = Self::get_order_id(sender.clone(), old_asset_id, old_price);
+            let new_order_id: [u8; 16] = Self::get_order_id(sender.clone(), new_asset_id, new_price);
+            // Transfer value.
+            let order_value = <OrderIdValues<T>>::get(old_order_id);
+            frame_support::ensure!(value <= order_value, Error::<T>::OrderTooSmall);
+            <OrderIdValues<T>>::insert(old_order_id, order_value - value);
+            let order_value = <OrderIdValues<T>>::get(new_order_id);
+            <OrderIdValues<T>>::insert(new_order_id, order_value + value);
+            // Log info.
+            Self::deposit_event(Event::RemoveFromOrder(sender.clone(), old_asset_id, old_price, value));
+            Self::deposit_event(Event::AddToOrder(sender, new_asset_id, new_price, value));
+			Ok(().into())
+		}
+
+        #[pallet::weight(50_000_000)]
 		pub(super) fn remove_from_order(origin: OriginFor<T>, asset_id: [u8; 16], price: u128, value: BalanceOf<T>) -> DispatchResultWithPostInfo {
             let sender = ensure_signed(origin)?;
             // Calculate order_id.
             let order_id: [u8; 16] = Self::get_order_id(sender.clone(), asset_id, price);
             // Check there is enough.
-            let order_total = <OrderIdValues<T>>::get(order_id);
-            frame_support::ensure!(value <= order_total, Error::<T>::OrderTooSmall);
+            let order_value = <OrderIdValues<T>>::get(order_id);
+            frame_support::ensure!(value <= order_value, Error::<T>::OrderTooSmall);
             // Move the value from the pallet to the sender.
             T::Currency::transfer(&Self::fund_account_id(), &sender, value, AllowDeath)
             				.map_err(|_| DispatchError::Other("Can't transfer value."))?;
             // Remove value from order.
-            <OrderIdValues<T>>::insert(order_id, order_total - value);
+            <OrderIdValues<T>>::insert(order_id, order_value - value);
             Self::deposit_event(Event::RemoveFromOrder(sender, asset_id, price, value));
 			Ok(().into())
 		}
