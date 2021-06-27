@@ -70,26 +70,28 @@ pub mod pallet {
 	impl<T: Config> Pallet<T> {
 
 		#[pallet::weight(50_000_000)]
-		pub fn add_to_order(origin: OriginFor<T>, asset_id: [u8; 16], price: u128, value: BalanceOf<T>) -> DispatchResultWithPostInfo {
+		pub fn add_to_order(origin: OriginFor<T>, asset_id: [u8; 16], price: u128, foreign_address: [u8; 32], value: BalanceOf<T>) -> DispatchResultWithPostInfo {
             let sender = ensure_signed(origin)?;
             // Calculate order_id.
-            let order_id: [u8; 16] = Self::get_order_id(sender.clone(), asset_id, price);
+            let order_id: [u8; 16] = Self::get_order_id(sender.clone(), asset_id, price, foreign_address);
             // Move the value from the sender to the pallet.
             T::Currency::transfer(&sender, &Self::fund_account_id(), value, AllowDeath)
             				.map_err(|_| DispatchError::Other("Can't transfer value."))?;
             // Add value to order.
             let order_total = <OrderIdValues<T>>::get(order_id);
             <OrderIdValues<T>>::insert(order_id, order_total + value);
-            Self::deposit_event(Event::AddToOrder(sender, asset_id, price, value));
+            Self::deposit_event(Event::AddToOrder(sender, asset_id, price, foreign_address, value));
 			Ok(().into())
 		}
 
         #[pallet::weight(50_000_000)]
-		pub fn change_order(origin: OriginFor<T>, old_asset_id: [u8; 16], old_price: u128, new_asset_id: [u8; 16], new_price: u128, value: BalanceOf<T>) -> DispatchResultWithPostInfo {
+		pub fn change_order(origin: OriginFor<T>, old_asset_id: [u8; 16], old_price: u128, old_foreign_address: [u8; 32],
+            new_asset_id: [u8; 16], new_price: u128, new_foreign_address: [u8; 32], value: BalanceOf<T>) -> DispatchResultWithPostInfo
+        {
             let sender = ensure_signed(origin)?;
             // Calculate order_ids.
-            let old_order_id: [u8; 16] = Self::get_order_id(sender.clone(), old_asset_id, old_price);
-            let new_order_id: [u8; 16] = Self::get_order_id(sender.clone(), new_asset_id, new_price);
+            let old_order_id: [u8; 16] = Self::get_order_id(sender.clone(), old_asset_id, old_price, old_foreign_address);
+            let new_order_id: [u8; 16] = Self::get_order_id(sender.clone(), new_asset_id, new_price, new_foreign_address);
             // Transfer value.
             let order_value = <OrderIdValues<T>>::get(old_order_id);
             frame_support::ensure!(value <= order_value, Error::<T>::OrderTooSmall);
@@ -97,33 +99,35 @@ pub mod pallet {
             let order_value = <OrderIdValues<T>>::get(new_order_id);
             <OrderIdValues<T>>::insert(new_order_id, order_value + value);
             // Log info.
-            Self::deposit_event(Event::RemoveFromOrder(sender.clone(), old_asset_id, old_price, value));
-            Self::deposit_event(Event::AddToOrder(sender, new_asset_id, new_price, value));
+            Self::deposit_event(Event::RemoveFromOrder(sender.clone(), old_asset_id, old_price, old_foreign_address, value));
+            Self::deposit_event(Event::AddToOrder(sender, new_asset_id, new_price, new_foreign_address, value));
 			Ok(().into())
 		}
 
         #[pallet::weight(50_000_000)]
-		pub fn change_order_all(origin: OriginFor<T>, old_asset_id: [u8; 16], old_price: u128, new_asset_id: [u8; 16], new_price: u128) -> DispatchResultWithPostInfo {
+        pub fn change_order_all(origin: OriginFor<T>, old_asset_id: [u8; 16], old_price: u128, old_foreign_address: [u8; 32],
+            new_asset_id: [u8; 16], new_price: u128, new_foreign_address: [u8; 32]) -> DispatchResultWithPostInfo
+        {
             let sender = ensure_signed(origin)?;
             // Calculate order_ids.
-            let old_order_id: [u8; 16] = Self::get_order_id(sender.clone(), old_asset_id, old_price);
-            let new_order_id: [u8; 16] = Self::get_order_id(sender.clone(), new_asset_id, new_price);
+            let old_order_id: [u8; 16] = Self::get_order_id(sender.clone(), old_asset_id, old_price, old_foreign_address);
+            let new_order_id: [u8; 16] = Self::get_order_id(sender.clone(), new_asset_id, new_price, new_foreign_address);
             // Transfer value.
             let old_order_value = <OrderIdValues<T>>::get(old_order_id);
             <OrderIdValues<T>>::remove(old_order_id);
             let new_order_value = <OrderIdValues<T>>::get(new_order_id);
             <OrderIdValues<T>>::insert(new_order_id, old_order_value + new_order_value);
             // Log info.
-            Self::deposit_event(Event::RemoveFromOrder(sender.clone(), old_asset_id, old_price, old_order_value));
-            Self::deposit_event(Event::AddToOrder(sender, new_asset_id, new_price, new_order_value));
+            Self::deposit_event(Event::RemoveFromOrder(sender.clone(), old_asset_id, old_price, old_foreign_address, old_order_value));
+            Self::deposit_event(Event::AddToOrder(sender, new_asset_id, new_price, new_foreign_address, old_order_value));
 			Ok(().into())
 		}
 
         #[pallet::weight(50_000_000)]
-		pub fn remove_from_order(origin: OriginFor<T>, asset_id: [u8; 16], price: u128, value: BalanceOf<T>) -> DispatchResultWithPostInfo {
+		pub fn remove_from_order(origin: OriginFor<T>, asset_id: [u8; 16], price: u128, foreign_address: [u8; 32], value: BalanceOf<T>) -> DispatchResultWithPostInfo {
             let sender = ensure_signed(origin)?;
             // Calculate order_id.
-            let order_id: [u8; 16] = Self::get_order_id(sender.clone(), asset_id, price);
+            let order_id: [u8; 16] = Self::get_order_id(sender.clone(), asset_id, price, foreign_address);
             // Check there is enough.
             let order_value = <OrderIdValues<T>>::get(order_id);
             frame_support::ensure!(value <= order_value, Error::<T>::OrderTooSmall);
@@ -132,30 +136,30 @@ pub mod pallet {
             				.map_err(|_| DispatchError::Other("Can't transfer value."))?;
             // Remove value from order.
             <OrderIdValues<T>>::insert(order_id, order_value - value);
-            Self::deposit_event(Event::RemoveFromOrder(sender, asset_id, price, value));
+            Self::deposit_event(Event::RemoveFromOrder(sender, asset_id, price, foreign_address, value));
 			Ok(().into())
 		}
 
         #[pallet::weight(50_000_000)]
-		pub fn remove_from_order_all(origin: OriginFor<T>, asset_id: [u8; 16], price: u128) -> DispatchResultWithPostInfo {
+        pub fn remove_from_order_all(origin: OriginFor<T>, asset_id: [u8; 16], price: u128, foreign_address: [u8; 32]) -> DispatchResultWithPostInfo {
             let sender = ensure_signed(origin)?;
             // Calculate order_id.
-            let order_id: [u8; 16] = Self::get_order_id(sender.clone(), asset_id, price);
+            let order_id: [u8; 16] = Self::get_order_id(sender.clone(), asset_id, price, foreign_address);
             let value = <OrderIdValues<T>>::get(order_id);
             // Move the value from the pallet to the sender.
             T::Currency::transfer(&Self::fund_account_id(), &sender, value, AllowDeath)
             				.map_err(|_| DispatchError::Other("Can't transfer value."))?;
             // Remove value from order.
             <OrderIdValues<T>>::remove(order_id);
-            Self::deposit_event(Event::RemoveFromOrder(sender, asset_id, price, value));
+            Self::deposit_event(Event::RemoveFromOrder(sender, asset_id, price, foreign_address, value));
 			Ok(().into())
 		}
 
         #[pallet::weight(50_000_000)]
-		pub fn lock_sell(origin: OriginFor<T>, hashed_secret: [u8; 32], asset_id: [u8; 16], price: u128, value: BalanceOf<T>, timeout: T::Moment) -> DispatchResultWithPostInfo {
+		pub fn lock_sell(origin: OriginFor<T>, hashed_secret: [u8; 32], asset_id: [u8; 16], price: u128, foreign_address: [u8; 32], value: BalanceOf<T>, timeout: T::Moment) -> DispatchResultWithPostInfo {
             let sender = ensure_signed(origin)?;
             // Calculate order_id.
-            let order_id: [u8; 16] = Self::get_order_id(sender.clone(), asset_id, price);
+            let order_id: [u8; 16] = Self::get_order_id(sender.clone(), asset_id, price, foreign_address);
             // Check there is enough.
             let order_total = <OrderIdValues<T>>::get(order_id);
             frame_support::ensure!(value <= order_total, Error::<T>::OrderTooSmall);
@@ -194,11 +198,11 @@ pub mod pallet {
 		}
 
         #[pallet::weight(50_000_000)]
-		pub fn timeout_sell(origin: OriginFor<T>, hashed_secret: [u8; 32], asset_id: [u8; 16], price: u128) -> DispatchResultWithPostInfo {
+		pub fn timeout_sell(origin: OriginFor<T>, hashed_secret: [u8; 32], asset_id: [u8; 16], price: u128, foreign_address: [u8; 32]) -> DispatchResultWithPostInfo {
             let sender = ensure_signed(origin)?;
             let _now = <pallet_timestamp::Pallet<T>>::get();
             // Calculate order_id.
-            let order_id: [u8; 16] = Self::get_order_id(sender.clone(), asset_id, price);
+            let order_id: [u8; 16] = Self::get_order_id(sender.clone(), asset_id, price, foreign_address);
             // Check order_id is correct and lock has timed out.
             let lock = <SellLocks<T>>::get(hashed_secret);
             frame_support::ensure!(lock.order_id == order_id, Error::<T>::WrongOrderId);
@@ -273,10 +277,10 @@ pub mod pallet {
 	#[pallet::metadata(T::AccountId = "AccountId", BalanceOf<T> = "Value", T::Moment = "Timestamp")]
 	#[pallet::generate_deposit(pub fn deposit_event)]
 	pub enum Event<T: Config> {
-        // Value was added to a sell order. \[seller\], \[asset_id\], \[price\], \[value\]
-        AddToOrder(T::AccountId, [u8; 16], u128, BalanceOf<T>),
-        // Value was removed from a sell order. \[seller\], \[asset_id\], \[price\], \[value\]
-        RemoveFromOrder(T::AccountId, [u8; 16], u128, BalanceOf<T>),
+        // Value was added to a sell order. \[seller\], \[asset_id\], \[price\], \[foriegn_address\], \[value\]
+        AddToOrder(T::AccountId, [u8; 16], u128, [u8; 32], BalanceOf<T>),
+        // Value was removed from a sell order. \[seller\], \[asset_id\], \[price\], \[foriegn_address\], \[value\]
+        RemoveFromOrder(T::AccountId, [u8; 16], u128, [u8; 32], BalanceOf<T>),
         // A sell lock was created. \[hashed_secret\], \[order_id\], \[value\], \[timeout\]
         LockSell([u8; 32], [u8; 16], BalanceOf<T>, T::Moment),
         // A sell lock was unlocked \[secret\], \[buyer\]
@@ -328,8 +332,8 @@ impl<T: Config> Pallet<T> {
 		T::PalletId::get().into_sub_account(0)
 	}
 
-    pub fn get_order_id(seller: T::AccountId, asset_id: [u8; 16], price: u128 ) -> [u8; 16] {
-        blake2_128(&[seller.encode(), asset_id.to_vec(), price.to_ne_bytes().to_vec()].concat())
+    pub fn get_order_id(seller: T::AccountId, asset_id: [u8; 16], price: u128, foreign_address: [u8; 32]) -> [u8; 16] {
+        blake2_128(&[seller.encode(), asset_id.to_vec(), price.to_ne_bytes().to_vec(), foreign_address.to_vec()].concat())
     }
 
 }
