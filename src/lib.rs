@@ -277,9 +277,9 @@ pub mod pallet {
 	#[pallet::metadata(T::AccountId = "AccountId", BalanceOf<T> = "Value", T::Moment = "Timestamp")]
 	#[pallet::generate_deposit(pub fn deposit_event)]
 	pub enum Event<T: Config> {
-        // Value was added to a sell order. \[seller\], \[asset_id\], \[price\], \[foriegn_address\], \[value\]
+        // Value was added to a sell order. \[seller\], \[asset_id\], \[price\], \[foreign_address\], \[value\]
         AddToOrder(T::AccountId, [u8; 16], u128, [u8; 32], BalanceOf<T>),
-        // Value was removed from a sell order. \[seller\], \[asset_id\], \[price\], \[foriegn_address\], \[value\]
+        // Value was removed from a sell order. \[seller\], \[asset_id\], \[price\], \[foreign_address\], \[value\]
         RemoveFromOrder(T::AccountId, [u8; 16], u128, [u8; 32], BalanceOf<T>),
         // A sell lock was created. \[hashed_secret\], \[order_id\], \[value\], \[timeout\]
         LockSell([u8; 32], [u8; 16], BalanceOf<T>, T::Moment),
