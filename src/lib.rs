@@ -274,7 +274,7 @@ pub mod pallet {
 	}
 
 	#[pallet::event]
-	#[pallet::metadata(T::AccountId = "AccountId", BalanceOf<T> = "Value", T::Moment = "Timestamp")]
+	#[pallet::metadata(T::AccountId = "AccountId", BalanceOf<T> = "Balance", T::Moment = "Timestamp")]
 	#[pallet::generate_deposit(pub fn deposit_event)]
 	pub enum Event<T: Config> {
         // Value was added to a sell order. \[seller\], \[asset_id\], \[price\], \[foreign_address\], \[value\]
