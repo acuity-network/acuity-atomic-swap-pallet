@@ -277,17 +277,17 @@ pub mod pallet {
 	#[pallet::metadata(T::AccountId = "AccountId", BalanceOf<T> = "Balance", T::Moment = "Timestamp")]
 	#[pallet::generate_deposit(pub fn deposit_event)]
 	pub enum Event<T: Config> {
-        /// Value was added to a sell order. \[seller\], \[asset_id\], \[price\], \[foreign_address\], \[value\]
+        /// Value was added to a sell order. \[seller, asset_id, price, foreign_address, value\]
         AddToOrder(T::AccountId, [u8; 16], u128, [u8; 32], BalanceOf<T>),
-        /// Value was removed from a sell order. \[seller\], \[asset_id\], \[price\], \[foreign_address\], \[value\]
+        /// Value was removed from a sell order. \[seller, asset_id, price, foreign_address, value\]
         RemoveFromOrder(T::AccountId, [u8; 16], u128, [u8; 32], BalanceOf<T>),
-        /// A sell lock was created. \[hashed_secret\], \[order_id\], \[value\], \[timeout\]
+        /// A sell lock was created. \[hashed_secret, order_id, value, timeout\]
         LockSell([u8; 32], [u8; 16], BalanceOf<T>, T::Moment),
-        /// A sell lock was unlocked \[secret\], \[buyer\]
+        /// A sell lock was unlocked \[secret, buyer\]
         UnlockSell([u8; 32], T::AccountId),
         /// A sell lock was timed out. \[hashed_secret\]
         TimeoutSell([u8; 32]),
-        /// A buy lock was created. \[order_id\], \[hashed_secret\], \[seller\], \[value\], \[timeout\]
+        /// A buy lock was created. \[hashed_secret, asset_id, order_id, seller, value, timeout\]
         LockBuy([u8; 32], [u8; 16], [u8; 16], T::AccountId, BalanceOf<T>, T::Moment),
         /// A buy lock was unlocked. \[hashed_secret\]
         UnlockBuy([u8; 32]),
