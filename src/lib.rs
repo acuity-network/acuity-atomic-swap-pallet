@@ -36,6 +36,12 @@ pub struct OrderId([u8; 16]);
 #[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, Default, RuntimeDebug)]
 pub struct AssetId([u8; 16]);
 
+/// A hashed secret (i.e. 32 bytes).
+///
+/// This gets serialized to the 0x-prefixed hex representation.
+#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, Default, RuntimeDebug)]
+pub struct HashedSecret([u8; 32]);
+
 /// A secret (i.e. 32 bytes).
 ///
 /// This gets serialized to the 0x-prefixed hex representation.
@@ -173,7 +179,7 @@ pub mod pallet {
 		}
 
         #[pallet::weight(50_000_000)]
-		pub fn lock_sell(origin: OriginFor<T>, hashed_secret: [u8; 32], asset_id: AssetId, price: u128, foreign_address: [u8; 32], value: BalanceOf<T>, timeout: T::Moment) -> DispatchResultWithPostInfo {
+		pub fn lock_sell(origin: OriginFor<T>, hashed_secret: HashedSecret, asset_id: AssetId, price: u128, foreign_address: [u8; 32], value: BalanceOf<T>, timeout: T::Moment) -> DispatchResultWithPostInfo {
             let sender = ensure_signed(origin)?;
             // Calculate order_id.
             let order_id = Self::get_order_id(sender.clone(), asset_id, price, foreign_address);
@@ -201,7 +207,8 @@ pub mod pallet {
             let sender = ensure_signed(origin)?;
 			let _now = <pallet_timestamp::Pallet<T>>::get();
             // Calculate hashed secret.
-            let hashed_secret: [u8; 32] = keccak_256(&secret.encode());
+            let mut hashed_secret = HashedSecret::default();
+            hashed_secret.0.copy_from_slice(&keccak_256(&secret.encode()));
             // Check sell lock has not timed out.
             let lock = <SellLocks<T>>::get(hashed_secret);
             frame_support::ensure!(lock.timeout > _now, Error::<T>::LockTimedOut);
@@ -215,7 +222,7 @@ pub mod pallet {
 		}
 
         #[pallet::weight(50_000_000)]
-		pub fn timeout_sell(origin: OriginFor<T>, hashed_secret: [u8; 32], asset_id: AssetId, price: u128, foreign_address: [u8; 32]) -> DispatchResultWithPostInfo {
+		pub fn timeout_sell(origin: OriginFor<T>, hashed_secret: HashedSecret, asset_id: AssetId, price: u128, foreign_address: [u8; 32]) -> DispatchResultWithPostInfo {
             let sender = ensure_signed(origin)?;
             let _now = <pallet_timestamp::Pallet<T>>::get();
             // Calculate order_id.
@@ -234,7 +241,7 @@ pub mod pallet {
 		}
 
         #[pallet::weight(50_000_000)]
-		pub fn lock_buy(origin: OriginFor<T>, hashed_secret: [u8; 32], asset_id: AssetId, order_id: OrderId, seller: T::AccountId, timeout: T::Moment, value: BalanceOf<T>, ) -> DispatchResultWithPostInfo {
+		pub fn lock_buy(origin: OriginFor<T>, hashed_secret: HashedSecret, asset_id: AssetId, order_id: OrderId, seller: T::AccountId, timeout: T::Moment, value: BalanceOf<T>, ) -> DispatchResultWithPostInfo {
             let sender = ensure_signed(origin)?;
             // Ensure hashed secret is not already in use.
             let lock = <BuyLocks<T>>::get(hashed_secret);
@@ -258,7 +265,8 @@ pub mod pallet {
             let sender = ensure_signed(origin)?;
             let _now = <pallet_timestamp::Pallet<T>>::get();
             // Calculate hashed secret.
-            let hashed_secret: [u8; 32] = keccak_256(&secret.encode());
+            let mut hashed_secret = HashedSecret::default();
+            hashed_secret.0.copy_from_slice(&keccak_256(&secret.encode()));
             // Check lock has not timed out.
             let lock = <BuyLocks<T>>::get(hashed_secret);
             frame_support::ensure!(lock.timeout > _now, Error::<T>::LockTimedOut);
@@ -276,7 +284,8 @@ pub mod pallet {
             let sender = ensure_signed(origin)?;
             let _now = <pallet_timestamp::Pallet<T>>::get();
             // Calculate hashed secret.
-            let hashed_secret: [u8; 32] = keccak_256(&secret.encode());
+            let mut hashed_secret = HashedSecret::default();
+            hashed_secret.0.copy_from_slice(&keccak_256(&secret.encode()));
             // Check lock has timed out.
             let lock = <BuyLocks<T>>::get(hashed_secret);
             frame_support::ensure!(lock.timeout <= _now, Error::<T>::LockNotTimedOut);
@@ -299,17 +308,17 @@ pub mod pallet {
         /// Value was removed from a sell order. \[seller, asset_id, price, foreign_address, value\]
         RemoveFromOrder(T::AccountId, AssetId, u128, [u8; 32], BalanceOf<T>),
         /// A sell lock was created. \[hashed_secret, order_id, value, timeout\]
-        LockSell([u8; 32], OrderId, BalanceOf<T>, T::Moment),
+        LockSell(HashedSecret, OrderId, BalanceOf<T>, T::Moment),
         /// A sell lock was unlocked \[secret, buyer\]
         UnlockSell(Secret, T::AccountId),
         /// A sell lock was timed out. \[hashed_secret\]
-        TimeoutSell([u8; 32]),
+        TimeoutSell(HashedSecret),
         /// A buy lock was created. \[hashed_secret, asset_id, order_id, seller, value, timeout\]
-        LockBuy([u8; 32], AssetId, OrderId, T::AccountId, BalanceOf<T>, T::Moment),
+        LockBuy(HashedSecret, AssetId, OrderId, T::AccountId, BalanceOf<T>, T::Moment),
         /// A buy lock was unlocked. \[hashed_secret\]
-        UnlockBuy([u8; 32]),
+        UnlockBuy(HashedSecret),
         /// A buy lock was timed out. \[hashed_secret\]
-        TimeoutBuy([u8; 32]),
+        TimeoutBuy(HashedSecret),
 	}
 
 	#[pallet::error]
@@ -332,11 +341,11 @@ pub mod pallet {
 
     #[pallet::storage]
     #[pallet::getter(fn sell_lock)]
-    pub(super) type SellLocks<T: Config> = StorageMap<_, Blake2_128Concat, [u8; 32], SellLock<BalanceOf<T>, T::Moment>, ValueQuery>;
+    pub(super) type SellLocks<T: Config> = StorageMap<_, Blake2_128Concat, HashedSecret, SellLock<BalanceOf<T>, T::Moment>, ValueQuery>;
 
     #[pallet::storage]
     #[pallet::getter(fn buy_lock)]
-    pub(super) type BuyLocks<T: Config> = StorageMap<_, Blake2_128Concat, [u8; 32], BuyLock<T::AccountId, BalanceOf<T>, T::Moment>, ValueQuery>;
+    pub(super) type BuyLocks<T: Config> = StorageMap<_, Blake2_128Concat, HashedSecret, BuyLock<T::AccountId, BalanceOf<T>, T::Moment>, ValueQuery>;
 }
 
 impl<T: Config> Pallet<T> {
