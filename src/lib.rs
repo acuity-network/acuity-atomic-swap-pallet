@@ -36,6 +36,12 @@ pub struct OrderId([u8; 16]);
 #[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, Default, RuntimeDebug)]
 pub struct AssetId([u8; 16]);
 
+/// A secret (i.e. 32 bytes).
+///
+/// This gets serialized to the 0x-prefixed hex representation.
+#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, Default, RuntimeDebug)]
+pub struct Secret([u8; 32]);
+
 #[frame_support::pallet]
 pub mod pallet {
 	use frame_support::pallet_prelude::*;
@@ -191,11 +197,11 @@ pub mod pallet {
 		}
 
         #[pallet::weight(50_000_000)]
-		pub fn unlock_sell(origin: OriginFor<T>, secret: [u8; 32]) -> DispatchResultWithPostInfo {
+		pub fn unlock_sell(origin: OriginFor<T>, secret: Secret) -> DispatchResultWithPostInfo {
             let sender = ensure_signed(origin)?;
 			let _now = <pallet_timestamp::Pallet<T>>::get();
             // Calculate hashed secret.
-            let hashed_secret: [u8; 32] = keccak_256(&secret);
+            let hashed_secret: [u8; 32] = keccak_256(&secret.encode());
             // Check sell lock has not timed out.
             let lock = <SellLocks<T>>::get(hashed_secret);
             frame_support::ensure!(lock.timeout > _now, Error::<T>::LockTimedOut);
@@ -248,11 +254,11 @@ pub mod pallet {
 		}
 
         #[pallet::weight(50_000_000)]
-		pub fn unlock_buy(origin: OriginFor<T>, secret: [u8; 32]) -> DispatchResultWithPostInfo {
+		pub fn unlock_buy(origin: OriginFor<T>, secret: Secret) -> DispatchResultWithPostInfo {
             let sender = ensure_signed(origin)?;
             let _now = <pallet_timestamp::Pallet<T>>::get();
             // Calculate hashed secret.
-            let hashed_secret: [u8; 32] = keccak_256(&secret);
+            let hashed_secret: [u8; 32] = keccak_256(&secret.encode());
             // Check lock has not timed out.
             let lock = <BuyLocks<T>>::get(hashed_secret);
             frame_support::ensure!(lock.timeout > _now, Error::<T>::LockTimedOut);
@@ -266,11 +272,11 @@ pub mod pallet {
 		}
 
         #[pallet::weight(50_000_000)]
-		pub fn timeout_buy(origin: OriginFor<T>, secret: [u8; 32]) -> DispatchResultWithPostInfo {
+		pub fn timeout_buy(origin: OriginFor<T>, secret: Secret) -> DispatchResultWithPostInfo {
             let sender = ensure_signed(origin)?;
             let _now = <pallet_timestamp::Pallet<T>>::get();
             // Calculate hashed secret.
-            let hashed_secret: [u8; 32] = keccak_256(&secret);
+            let hashed_secret: [u8; 32] = keccak_256(&secret.encode());
             // Check lock has timed out.
             let lock = <BuyLocks<T>>::get(hashed_secret);
             frame_support::ensure!(lock.timeout <= _now, Error::<T>::LockNotTimedOut);
@@ -295,7 +301,7 @@ pub mod pallet {
         /// A sell lock was created. \[hashed_secret, order_id, value, timeout\]
         LockSell([u8; 32], OrderId, BalanceOf<T>, T::Moment),
         /// A sell lock was unlocked \[secret, buyer\]
-        UnlockSell([u8; 32], T::AccountId),
+        UnlockSell(Secret, T::AccountId),
         /// A sell lock was timed out. \[hashed_secret\]
         TimeoutSell([u8; 32]),
         /// A buy lock was created. \[hashed_secret, asset_id, order_id, seller, value, timeout\]

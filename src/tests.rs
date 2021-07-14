@@ -234,8 +234,8 @@ fn lock_sell() {
 fn unlock_sell_control_timed_out() {
     new_test_ext().execute_with(|| {
         let price: u128 = 5;
-        let secret = [0; 32];
-        let hashed_secret: [u8; 32] = keccak_256(&secret);
+        let secret = Secret::default();
+        let hashed_secret: [u8; 32] = keccak_256(&secret.encode());
         let _now = <pallet_timestamp::Pallet<Test>>::get();
         assert_ok!(AcuityAtomicSwap::add_to_order(Origin::signed(A), AssetId::default(), price, [0; 32], 50));
         assert_ok!(AcuityAtomicSwap::lock_sell(Origin::signed(A), hashed_secret, AssetId::default(), price, [0; 32], 10, _now + 1000));
@@ -247,8 +247,8 @@ fn unlock_sell_control_timed_out() {
 fn unlock_sell_fail_timed_out() {
     new_test_ext().execute_with(|| {
         let price: u128 = 5;
-        let secret = [0; 32];
-        let hashed_secret: [u8; 32] = keccak_256(&secret);
+        let secret = Secret::default();
+        let hashed_secret: [u8; 32] = keccak_256(&secret.encode());
         let _now = <pallet_timestamp::Pallet<Test>>::get();
 		assert_ok!(AcuityAtomicSwap::add_to_order(Origin::signed(A), AssetId::default(), price, [0; 32], 50));
         assert_ok!(AcuityAtomicSwap::lock_sell(Origin::signed(A), hashed_secret, AssetId::default(), price, [0; 32], 10, _now));
@@ -263,8 +263,8 @@ fn unlock_sell_fail_timed_out() {
 fn unlock_sell() {
 	new_test_ext().execute_with(|| {
         let price: u128 = 5;
-        let secret = [0; 32];
-        let hashed_secret: [u8; 32] = keccak_256(&secret);
+        let secret = Secret::default();
+        let hashed_secret: [u8; 32] = keccak_256(&secret.encode());
         let _now = <pallet_timestamp::Pallet<Test>>::get();
 		assert_ok!(AcuityAtomicSwap::add_to_order(Origin::signed(A), AssetId::default(), price, [0; 32], 50));
 
@@ -433,8 +433,8 @@ fn lock_buy() {
 #[test]
 fn unlock_buy_control_timed_out() {
     new_test_ext().execute_with(|| {
-        let secret = [0; 32];
-        let hashed_secret: [u8; 32] = keccak_256(&secret);
+        let secret = Secret::default();
+        let hashed_secret: [u8; 32] = keccak_256(&secret.encode());
         let _now = <pallet_timestamp::Pallet<Test>>::get();
         assert_ok!(AcuityAtomicSwap::lock_buy(Origin::signed(B), hashed_secret, AssetId::default(), OrderId::default(), A, _now + 1000, 50));
         assert_ok!(AcuityAtomicSwap::unlock_buy(Origin::signed(A), secret));
@@ -444,8 +444,8 @@ fn unlock_buy_control_timed_out() {
 #[test]
 fn unlock_buy_fail_timed_out() {
     new_test_ext().execute_with(|| {
-        let secret = [0; 32];
-        let hashed_secret: [u8; 32] = keccak_256(&secret);
+        let secret = Secret::default();
+        let hashed_secret: [u8; 32] = keccak_256(&secret.encode());
         let _now = <pallet_timestamp::Pallet<Test>>::get();
         assert_ok!(AcuityAtomicSwap::lock_buy(Origin::signed(B), hashed_secret, AssetId::default(), OrderId::default(), A, _now, 50));
 		assert_noop!(
@@ -458,8 +458,8 @@ fn unlock_buy_fail_timed_out() {
 #[test]
 fn unlock_buy() {
 	new_test_ext().execute_with(|| {
-        let secret = [0; 32];
-        let hashed_secret: [u8; 32] = keccak_256(&secret);
+        let secret = Secret::default();
+        let hashed_secret: [u8; 32] = keccak_256(&secret.encode());
         let _now = <pallet_timestamp::Pallet<Test>>::get();
         assert_ok!(AcuityAtomicSwap::lock_buy(Origin::signed(B), hashed_secret, AssetId::default(), OrderId::default(), A, _now + 1000, 50));
 
@@ -487,8 +487,8 @@ fn unlock_buy() {
 #[test]
 fn timeout_buy_control_not_timed_out() {
     new_test_ext().execute_with(|| {
-        let secret = [0; 32];
-        let hashed_secret: [u8; 32] = keccak_256(&secret);
+        let secret = Secret::default();
+        let hashed_secret: [u8; 32] = keccak_256(&secret.encode());
         let _now = <pallet_timestamp::Pallet<Test>>::get();
         assert_ok!(AcuityAtomicSwap::lock_buy(Origin::signed(B), hashed_secret, AssetId::default(), OrderId::default(), A, _now, 50));
         assert_ok!(AcuityAtomicSwap::timeout_buy(Origin::signed(B), secret));
@@ -498,8 +498,8 @@ fn timeout_buy_control_not_timed_out() {
 #[test]
 fn timeout_buy_fail_not_timed_out() {
     new_test_ext().execute_with(|| {
-        let secret = [0; 32];
-        let hashed_secret: [u8; 32] = keccak_256(&secret);
+        let secret = Secret::default();
+        let hashed_secret: [u8; 32] = keccak_256(&secret.encode());
         let _now = <pallet_timestamp::Pallet<Test>>::get();
         assert_ok!(AcuityAtomicSwap::lock_buy(Origin::signed(B), hashed_secret, AssetId::default(), OrderId::default(), A, _now + 1000, 50));
 		assert_noop!(
@@ -512,8 +512,8 @@ fn timeout_buy_fail_not_timed_out() {
 #[test]
 fn timeout_buy() {
 	new_test_ext().execute_with(|| {
-        let secret = [0; 32];
-        let hashed_secret: [u8; 32] = keccak_256(&secret);
+        let secret = Secret::default();
+        let hashed_secret: [u8; 32] = keccak_256(&secret.encode());
         let _now = <pallet_timestamp::Pallet<Test>>::get();
         assert_ok!(AcuityAtomicSwap::lock_buy(Origin::signed(B), hashed_secret, AssetId::default(), OrderId::default(), A, _now, 50));
 
