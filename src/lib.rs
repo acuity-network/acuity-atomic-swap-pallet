@@ -30,6 +30,11 @@ mod tests;
 #[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, Default, RuntimeDebug)]
 pub struct OrderId([u8; 16]);
 
+/// An Asset Id (i.e. 16 bytes).
+///
+/// This gets serialized to the 0x-prefixed hex representation.
+#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, Default, RuntimeDebug)]
+pub struct AssetId([u8; 16]);
 
 #[frame_support::pallet]
 pub mod pallet {
@@ -76,7 +81,7 @@ pub mod pallet {
 	impl<T: Config> Pallet<T> {
 
 		#[pallet::weight(50_000_000)]
-		pub fn add_to_order(origin: OriginFor<T>, asset_id: [u8; 16], price: u128, foreign_address: [u8; 32], value: BalanceOf<T>) -> DispatchResultWithPostInfo {
+		pub fn add_to_order(origin: OriginFor<T>, asset_id: AssetId, price: u128, foreign_address: [u8; 32], value: BalanceOf<T>) -> DispatchResultWithPostInfo {
             let sender = ensure_signed(origin)?;
             // Calculate order_id.
             let order_id = Self::get_order_id(sender.clone(), asset_id, price, foreign_address);
@@ -91,8 +96,8 @@ pub mod pallet {
 		}
 
         #[pallet::weight(50_000_000)]
-		pub fn change_order(origin: OriginFor<T>, old_asset_id: [u8; 16], old_price: u128, old_foreign_address: [u8; 32],
-            new_asset_id: [u8; 16], new_price: u128, new_foreign_address: [u8; 32], value: BalanceOf<T>) -> DispatchResultWithPostInfo
+		pub fn change_order(origin: OriginFor<T>, old_asset_id: AssetId, old_price: u128, old_foreign_address: [u8; 32],
+            new_asset_id: AssetId, new_price: u128, new_foreign_address: [u8; 32], value: BalanceOf<T>) -> DispatchResultWithPostInfo
         {
             let sender = ensure_signed(origin)?;
             // Calculate order_ids.
@@ -111,8 +116,8 @@ pub mod pallet {
 		}
 
         #[pallet::weight(50_000_000)]
-        pub fn change_order_all(origin: OriginFor<T>, old_asset_id: [u8; 16], old_price: u128, old_foreign_address: [u8; 32],
-            new_asset_id: [u8; 16], new_price: u128, new_foreign_address: [u8; 32]) -> DispatchResultWithPostInfo
+        pub fn change_order_all(origin: OriginFor<T>, old_asset_id: AssetId, old_price: u128, old_foreign_address: [u8; 32],
+            new_asset_id: AssetId, new_price: u128, new_foreign_address: [u8; 32]) -> DispatchResultWithPostInfo
         {
             let sender = ensure_signed(origin)?;
             // Calculate order_ids.
@@ -130,7 +135,7 @@ pub mod pallet {
 		}
 
         #[pallet::weight(50_000_000)]
-		pub fn remove_from_order(origin: OriginFor<T>, asset_id: [u8; 16], price: u128, foreign_address: [u8; 32], value: BalanceOf<T>) -> DispatchResultWithPostInfo {
+		pub fn remove_from_order(origin: OriginFor<T>, asset_id: AssetId, price: u128, foreign_address: [u8; 32], value: BalanceOf<T>) -> DispatchResultWithPostInfo {
             let sender = ensure_signed(origin)?;
             // Calculate order_id.
             let order_id = Self::get_order_id(sender.clone(), asset_id, price, foreign_address);
@@ -147,7 +152,7 @@ pub mod pallet {
 		}
 
         #[pallet::weight(50_000_000)]
-        pub fn remove_from_order_all(origin: OriginFor<T>, asset_id: [u8; 16], price: u128, foreign_address: [u8; 32]) -> DispatchResultWithPostInfo {
+        pub fn remove_from_order_all(origin: OriginFor<T>, asset_id: AssetId, price: u128, foreign_address: [u8; 32]) -> DispatchResultWithPostInfo {
             let sender = ensure_signed(origin)?;
             // Calculate order_id.
             let order_id = Self::get_order_id(sender.clone(), asset_id, price, foreign_address);
@@ -162,7 +167,7 @@ pub mod pallet {
 		}
 
         #[pallet::weight(50_000_000)]
-		pub fn lock_sell(origin: OriginFor<T>, hashed_secret: [u8; 32], asset_id: [u8; 16], price: u128, foreign_address: [u8; 32], value: BalanceOf<T>, timeout: T::Moment) -> DispatchResultWithPostInfo {
+		pub fn lock_sell(origin: OriginFor<T>, hashed_secret: [u8; 32], asset_id: AssetId, price: u128, foreign_address: [u8; 32], value: BalanceOf<T>, timeout: T::Moment) -> DispatchResultWithPostInfo {
             let sender = ensure_signed(origin)?;
             // Calculate order_id.
             let order_id = Self::get_order_id(sender.clone(), asset_id, price, foreign_address);
@@ -204,7 +209,7 @@ pub mod pallet {
 		}
 
         #[pallet::weight(50_000_000)]
-		pub fn timeout_sell(origin: OriginFor<T>, hashed_secret: [u8; 32], asset_id: [u8; 16], price: u128, foreign_address: [u8; 32]) -> DispatchResultWithPostInfo {
+		pub fn timeout_sell(origin: OriginFor<T>, hashed_secret: [u8; 32], asset_id: AssetId, price: u128, foreign_address: [u8; 32]) -> DispatchResultWithPostInfo {
             let sender = ensure_signed(origin)?;
             let _now = <pallet_timestamp::Pallet<T>>::get();
             // Calculate order_id.
@@ -223,7 +228,7 @@ pub mod pallet {
 		}
 
         #[pallet::weight(50_000_000)]
-		pub fn lock_buy(origin: OriginFor<T>, hashed_secret: [u8; 32], asset_id: [u8; 16], order_id: OrderId, seller: T::AccountId, timeout: T::Moment, value: BalanceOf<T>, ) -> DispatchResultWithPostInfo {
+		pub fn lock_buy(origin: OriginFor<T>, hashed_secret: [u8; 32], asset_id: AssetId, order_id: OrderId, seller: T::AccountId, timeout: T::Moment, value: BalanceOf<T>, ) -> DispatchResultWithPostInfo {
             let sender = ensure_signed(origin)?;
             // Ensure hashed secret is not already in use.
             let lock = <BuyLocks<T>>::get(hashed_secret);
@@ -284,9 +289,9 @@ pub mod pallet {
 	#[pallet::generate_deposit(pub fn deposit_event)]
 	pub enum Event<T: Config> {
         /// Value was added to a sell order. \[seller, asset_id, price, foreign_address, value\]
-        AddToOrder(T::AccountId, [u8; 16], u128, [u8; 32], BalanceOf<T>),
+        AddToOrder(T::AccountId, AssetId, u128, [u8; 32], BalanceOf<T>),
         /// Value was removed from a sell order. \[seller, asset_id, price, foreign_address, value\]
-        RemoveFromOrder(T::AccountId, [u8; 16], u128, [u8; 32], BalanceOf<T>),
+        RemoveFromOrder(T::AccountId, AssetId, u128, [u8; 32], BalanceOf<T>),
         /// A sell lock was created. \[hashed_secret, order_id, value, timeout\]
         LockSell([u8; 32], OrderId, BalanceOf<T>, T::Moment),
         /// A sell lock was unlocked \[secret, buyer\]
@@ -294,7 +299,7 @@ pub mod pallet {
         /// A sell lock was timed out. \[hashed_secret\]
         TimeoutSell([u8; 32]),
         /// A buy lock was created. \[hashed_secret, asset_id, order_id, seller, value, timeout\]
-        LockBuy([u8; 32], [u8; 16], OrderId, T::AccountId, BalanceOf<T>, T::Moment),
+        LockBuy([u8; 32], AssetId, OrderId, T::AccountId, BalanceOf<T>, T::Moment),
         /// A buy lock was unlocked. \[hashed_secret\]
         UnlockBuy([u8; 32]),
         /// A buy lock was timed out. \[hashed_secret\]
@@ -337,9 +342,9 @@ impl<T: Config> Pallet<T> {
 		T::PalletId::get().into_sub_account(0)
 	}
 
-    pub fn get_order_id(seller: T::AccountId, asset_id: [u8; 16], price: u128, foreign_address: [u8; 32]) -> OrderId {
+    pub fn get_order_id(seller: T::AccountId, asset_id: AssetId, price: u128, foreign_address: [u8; 32]) -> OrderId {
         let mut order_id = OrderId::default();
-		order_id.0.copy_from_slice(&blake2_128(&[seller.encode(), asset_id.to_vec(), price.to_ne_bytes().to_vec(), foreign_address.to_vec()].concat()));
+		order_id.0.copy_from_slice(&blake2_128(&[seller.encode(), asset_id.encode(), price.to_ne_bytes().to_vec(), foreign_address.to_vec()].concat()));
         order_id
     }
 
