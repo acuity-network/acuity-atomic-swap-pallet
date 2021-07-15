@@ -28,31 +28,31 @@ mod tests;
 ///
 /// This gets serialized to the 0x-prefixed hex representation.
 #[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, Default, RuntimeDebug)]
-pub struct OrderId([u8; 16]);
+pub struct AcuityOrderId([u8; 16]);
 
 /// An Asset Id (i.e. 16 bytes).
 ///
 /// This gets serialized to the 0x-prefixed hex representation.
 #[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, Default, RuntimeDebug)]
-pub struct AssetId([u8; 16]);
+pub struct AcuityAssetId([u8; 16]);
 
 /// A Foreign Address (i.e. 32 bytes).
 ///
 /// This gets serialized to the 0x-prefixed hex representation.
 #[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, Default, RuntimeDebug)]
-pub struct ForeignAddress([u8; 32]);
+pub struct AcuityForeignAddress([u8; 32]);
 
 /// A hashed secret (i.e. 32 bytes).
 ///
 /// This gets serialized to the 0x-prefixed hex representation.
 #[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, Default, RuntimeDebug)]
-pub struct HashedSecret([u8; 32]);
+pub struct AcuityHashedSecret([u8; 32]);
 
 /// A secret (i.e. 32 bytes).
 ///
 /// This gets serialized to the 0x-prefixed hex representation.
 #[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, Default, RuntimeDebug)]
-pub struct Secret([u8; 32]);
+pub struct AcuitySecret([u8; 32]);
 
 #[frame_support::pallet]
 pub mod pallet {
@@ -65,7 +65,7 @@ pub mod pallet {
 
     #[derive(Encode, Decode, Default, Clone, PartialEq)]
     pub struct SellLock<Balance, Moment> {
-        pub order_id: OrderId,
+        pub order_id: AcuityOrderId,
         pub value: Balance,
         pub timeout: Moment,
     }
@@ -99,7 +99,7 @@ pub mod pallet {
 	impl<T: Config> Pallet<T> {
 
 		#[pallet::weight(50_000_000)]
-		pub fn add_to_order(origin: OriginFor<T>, asset_id: AssetId, price: u128, foreign_address: ForeignAddress, value: BalanceOf<T>) -> DispatchResultWithPostInfo {
+		pub fn add_to_order(origin: OriginFor<T>, asset_id: AcuityAssetId, price: u128, foreign_address: AcuityForeignAddress, value: BalanceOf<T>) -> DispatchResultWithPostInfo {
             let sender = ensure_signed(origin)?;
             // Calculate order_id.
             let order_id = Self::get_order_id(sender.clone(), asset_id, price, foreign_address);
@@ -107,26 +107,26 @@ pub mod pallet {
             T::Currency::transfer(&sender, &Self::fund_account_id(), value, AllowDeath)
             				.map_err(|_| DispatchError::Other("Can't transfer value."))?;
             // Add value to order.
-            let order_total = <OrderIdValues<T>>::get(order_id);
-            <OrderIdValues<T>>::insert(order_id, order_total + value);
+            let order_total = <AcuityOrderIdValues<T>>::get(order_id);
+            <AcuityOrderIdValues<T>>::insert(order_id, order_total + value);
             Self::deposit_event(Event::AddToOrder(sender, asset_id, price, foreign_address, value));
 			Ok(().into())
 		}
 
         #[pallet::weight(50_000_000)]
-		pub fn change_order(origin: OriginFor<T>, old_asset_id: AssetId, old_price: u128, old_foreign_address: ForeignAddress,
-            new_asset_id: AssetId, new_price: u128, new_foreign_address: ForeignAddress, value: BalanceOf<T>) -> DispatchResultWithPostInfo
+		pub fn change_order(origin: OriginFor<T>, old_asset_id: AcuityAssetId, old_price: u128, old_foreign_address: AcuityForeignAddress,
+            new_asset_id: AcuityAssetId, new_price: u128, new_foreign_address: AcuityForeignAddress, value: BalanceOf<T>) -> DispatchResultWithPostInfo
         {
             let sender = ensure_signed(origin)?;
             // Calculate order_ids.
             let old_order_id = Self::get_order_id(sender.clone(), old_asset_id, old_price, old_foreign_address);
             let new_order_id = Self::get_order_id(sender.clone(), new_asset_id, new_price, new_foreign_address);
             // Transfer value.
-            let order_value = <OrderIdValues<T>>::get(old_order_id);
+            let order_value = <AcuityOrderIdValues<T>>::get(old_order_id);
             frame_support::ensure!(value <= order_value, Error::<T>::OrderTooSmall);
-            <OrderIdValues<T>>::insert(old_order_id, order_value - value);
-            let order_value = <OrderIdValues<T>>::get(new_order_id);
-            <OrderIdValues<T>>::insert(new_order_id, order_value + value);
+            <AcuityOrderIdValues<T>>::insert(old_order_id, order_value - value);
+            let order_value = <AcuityOrderIdValues<T>>::get(new_order_id);
+            <AcuityOrderIdValues<T>>::insert(new_order_id, order_value + value);
             // Log info.
             Self::deposit_event(Event::RemoveFromOrder(sender.clone(), old_asset_id, old_price, old_foreign_address, value));
             Self::deposit_event(Event::AddToOrder(sender, new_asset_id, new_price, new_foreign_address, value));
@@ -134,18 +134,18 @@ pub mod pallet {
 		}
 
         #[pallet::weight(50_000_000)]
-        pub fn change_order_all(origin: OriginFor<T>, old_asset_id: AssetId, old_price: u128, old_foreign_address: ForeignAddress,
-            new_asset_id: AssetId, new_price: u128, new_foreign_address: ForeignAddress) -> DispatchResultWithPostInfo
+        pub fn change_order_all(origin: OriginFor<T>, old_asset_id: AcuityAssetId, old_price: u128, old_foreign_address: AcuityForeignAddress,
+            new_asset_id: AcuityAssetId, new_price: u128, new_foreign_address: AcuityForeignAddress) -> DispatchResultWithPostInfo
         {
             let sender = ensure_signed(origin)?;
             // Calculate order_ids.
             let old_order_id = Self::get_order_id(sender.clone(), old_asset_id, old_price, old_foreign_address);
             let new_order_id = Self::get_order_id(sender.clone(), new_asset_id, new_price, new_foreign_address);
             // Transfer value.
-            let old_order_value = <OrderIdValues<T>>::get(old_order_id);
-            <OrderIdValues<T>>::remove(old_order_id);
-            let new_order_value = <OrderIdValues<T>>::get(new_order_id);
-            <OrderIdValues<T>>::insert(new_order_id, old_order_value + new_order_value);
+            let old_order_value = <AcuityOrderIdValues<T>>::get(old_order_id);
+            <AcuityOrderIdValues<T>>::remove(old_order_id);
+            let new_order_value = <AcuityOrderIdValues<T>>::get(new_order_id);
+            <AcuityOrderIdValues<T>>::insert(new_order_id, old_order_value + new_order_value);
             // Log info.
             Self::deposit_event(Event::RemoveFromOrder(sender.clone(), old_asset_id, old_price, old_foreign_address, old_order_value));
             Self::deposit_event(Event::AddToOrder(sender, new_asset_id, new_price, new_foreign_address, old_order_value));
@@ -153,50 +153,50 @@ pub mod pallet {
 		}
 
         #[pallet::weight(50_000_000)]
-		pub fn remove_from_order(origin: OriginFor<T>, asset_id: AssetId, price: u128, foreign_address: ForeignAddress, value: BalanceOf<T>) -> DispatchResultWithPostInfo {
+		pub fn remove_from_order(origin: OriginFor<T>, asset_id: AcuityAssetId, price: u128, foreign_address: AcuityForeignAddress, value: BalanceOf<T>) -> DispatchResultWithPostInfo {
             let sender = ensure_signed(origin)?;
             // Calculate order_id.
             let order_id = Self::get_order_id(sender.clone(), asset_id, price, foreign_address);
             // Check there is enough.
-            let order_value = <OrderIdValues<T>>::get(order_id);
+            let order_value = <AcuityOrderIdValues<T>>::get(order_id);
             frame_support::ensure!(value <= order_value, Error::<T>::OrderTooSmall);
             // Move the value from the pallet to the sender.
             T::Currency::transfer(&Self::fund_account_id(), &sender, value, AllowDeath)
             				.map_err(|_| DispatchError::Other("Can't transfer value."))?;
             // Remove value from order.
-            <OrderIdValues<T>>::insert(order_id, order_value - value);
+            <AcuityOrderIdValues<T>>::insert(order_id, order_value - value);
             Self::deposit_event(Event::RemoveFromOrder(sender, asset_id, price, foreign_address, value));
 			Ok(().into())
 		}
 
         #[pallet::weight(50_000_000)]
-        pub fn remove_from_order_all(origin: OriginFor<T>, asset_id: AssetId, price: u128, foreign_address: ForeignAddress) -> DispatchResultWithPostInfo {
+        pub fn remove_from_order_all(origin: OriginFor<T>, asset_id: AcuityAssetId, price: u128, foreign_address: AcuityForeignAddress) -> DispatchResultWithPostInfo {
             let sender = ensure_signed(origin)?;
             // Calculate order_id.
             let order_id = Self::get_order_id(sender.clone(), asset_id, price, foreign_address);
-            let value = <OrderIdValues<T>>::get(order_id);
+            let value = <AcuityOrderIdValues<T>>::get(order_id);
             // Move the value from the pallet to the sender.
             T::Currency::transfer(&Self::fund_account_id(), &sender, value, AllowDeath)
             				.map_err(|_| DispatchError::Other("Can't transfer value."))?;
             // Remove value from order.
-            <OrderIdValues<T>>::remove(order_id);
+            <AcuityOrderIdValues<T>>::remove(order_id);
             Self::deposit_event(Event::RemoveFromOrder(sender, asset_id, price, foreign_address, value));
 			Ok(().into())
 		}
 
         #[pallet::weight(50_000_000)]
-		pub fn lock_sell(origin: OriginFor<T>, hashed_secret: HashedSecret, asset_id: AssetId, price: u128, foreign_address: ForeignAddress, value: BalanceOf<T>, timeout: T::Moment) -> DispatchResultWithPostInfo {
+		pub fn lock_sell(origin: OriginFor<T>, hashed_secret: AcuityHashedSecret, asset_id: AcuityAssetId, price: u128, foreign_address: AcuityForeignAddress, value: BalanceOf<T>, timeout: T::Moment) -> DispatchResultWithPostInfo {
             let sender = ensure_signed(origin)?;
             // Calculate order_id.
             let order_id = Self::get_order_id(sender.clone(), asset_id, price, foreign_address);
             // Check there is enough.
-            let order_total = <OrderIdValues<T>>::get(order_id);
+            let order_total = <AcuityOrderIdValues<T>>::get(order_id);
             frame_support::ensure!(value <= order_total, Error::<T>::OrderTooSmall);
             // Ensure hashed secret is not already in use.
             let lock = <SellLocks<T>>::get(hashed_secret);
             frame_support::ensure!(TryInto::<u64>::try_into(lock.value).ok() == Some(0), Error::<T>::HashedSecretAlreadyInUse);
             // Move value into sell lock.
-            <OrderIdValues<T>>::insert(order_id, order_total - value);
+            <AcuityOrderIdValues<T>>::insert(order_id, order_total - value);
 
             let sell_lock: SellLock<BalanceOf<T>, T::Moment> = SellLock {
                 order_id: order_id,
@@ -209,11 +209,11 @@ pub mod pallet {
 		}
 
         #[pallet::weight(50_000_000)]
-		pub fn unlock_sell(origin: OriginFor<T>, secret: Secret) -> DispatchResultWithPostInfo {
+		pub fn unlock_sell(origin: OriginFor<T>, secret: AcuitySecret) -> DispatchResultWithPostInfo {
             let sender = ensure_signed(origin)?;
 			let _now = <pallet_timestamp::Pallet<T>>::get();
             // Calculate hashed secret.
-            let mut hashed_secret = HashedSecret::default();
+            let mut hashed_secret = AcuityHashedSecret::default();
             hashed_secret.0.copy_from_slice(&keccak_256(&secret.encode()));
             // Check sell lock has not timed out.
             let lock = <SellLocks<T>>::get(hashed_secret);
@@ -228,7 +228,7 @@ pub mod pallet {
 		}
 
         #[pallet::weight(50_000_000)]
-		pub fn timeout_sell(origin: OriginFor<T>, hashed_secret: HashedSecret, asset_id: AssetId, price: u128, foreign_address: ForeignAddress) -> DispatchResultWithPostInfo {
+		pub fn timeout_sell(origin: OriginFor<T>, hashed_secret: AcuityHashedSecret, asset_id: AcuityAssetId, price: u128, foreign_address: AcuityForeignAddress) -> DispatchResultWithPostInfo {
             let sender = ensure_signed(origin)?;
             let _now = <pallet_timestamp::Pallet<T>>::get();
             // Calculate order_id.
@@ -240,14 +240,14 @@ pub mod pallet {
             // Delete lock.
             <SellLocks<T>>::remove(hashed_secret);
             // Return funds to sell order.
-            let order_total = <OrderIdValues<T>>::get(order_id);
-            <OrderIdValues<T>>::insert(order_id, order_total + lock.value);
+            let order_total = <AcuityOrderIdValues<T>>::get(order_id);
+            <AcuityOrderIdValues<T>>::insert(order_id, order_total + lock.value);
             Self::deposit_event(Event::TimeoutSell(hashed_secret));
 			Ok(().into())
 		}
 
         #[pallet::weight(50_000_000)]
-		pub fn lock_buy(origin: OriginFor<T>, hashed_secret: HashedSecret, asset_id: AssetId, order_id: OrderId, seller: T::AccountId, timeout: T::Moment, value: BalanceOf<T>, ) -> DispatchResultWithPostInfo {
+		pub fn lock_buy(origin: OriginFor<T>, hashed_secret: AcuityHashedSecret, asset_id: AcuityAssetId, order_id: AcuityOrderId, seller: T::AccountId, timeout: T::Moment, value: BalanceOf<T>, ) -> DispatchResultWithPostInfo {
             let sender = ensure_signed(origin)?;
             // Ensure hashed secret is not already in use.
             let lock = <BuyLocks<T>>::get(hashed_secret);
@@ -267,11 +267,11 @@ pub mod pallet {
 		}
 
         #[pallet::weight(50_000_000)]
-		pub fn unlock_buy(origin: OriginFor<T>, secret: Secret) -> DispatchResultWithPostInfo {
+		pub fn unlock_buy(origin: OriginFor<T>, secret: AcuitySecret) -> DispatchResultWithPostInfo {
             let sender = ensure_signed(origin)?;
             let _now = <pallet_timestamp::Pallet<T>>::get();
             // Calculate hashed secret.
-            let mut hashed_secret = HashedSecret::default();
+            let mut hashed_secret = AcuityHashedSecret::default();
             hashed_secret.0.copy_from_slice(&keccak_256(&secret.encode()));
             // Check lock has not timed out.
             let lock = <BuyLocks<T>>::get(hashed_secret);
@@ -286,11 +286,11 @@ pub mod pallet {
 		}
 
         #[pallet::weight(50_000_000)]
-		pub fn timeout_buy(origin: OriginFor<T>, secret: Secret) -> DispatchResultWithPostInfo {
+		pub fn timeout_buy(origin: OriginFor<T>, secret: AcuitySecret) -> DispatchResultWithPostInfo {
             let sender = ensure_signed(origin)?;
             let _now = <pallet_timestamp::Pallet<T>>::get();
             // Calculate hashed secret.
-            let mut hashed_secret = HashedSecret::default();
+            let mut hashed_secret = AcuityHashedSecret::default();
             hashed_secret.0.copy_from_slice(&keccak_256(&secret.encode()));
             // Check lock has timed out.
             let lock = <BuyLocks<T>>::get(hashed_secret);
@@ -310,21 +310,21 @@ pub mod pallet {
 	#[pallet::generate_deposit(pub fn deposit_event)]
 	pub enum Event<T: Config> {
         /// Value was added to a sell order. \[seller, asset_id, price, foreign_address, value\]
-        AddToOrder(T::AccountId, AssetId, u128, ForeignAddress, BalanceOf<T>),
+        AddToOrder(T::AccountId, AcuityAssetId, u128, AcuityForeignAddress, BalanceOf<T>),
         /// Value was removed from a sell order. \[seller, asset_id, price, foreign_address, value\]
-        RemoveFromOrder(T::AccountId, AssetId, u128, ForeignAddress, BalanceOf<T>),
+        RemoveFromOrder(T::AccountId, AcuityAssetId, u128, AcuityForeignAddress, BalanceOf<T>),
         /// A sell lock was created. \[hashed_secret, order_id, value, timeout\]
-        LockSell(HashedSecret, OrderId, BalanceOf<T>, T::Moment),
+        LockSell(AcuityHashedSecret, AcuityOrderId, BalanceOf<T>, T::Moment),
         /// A sell lock was unlocked \[secret, buyer\]
-        UnlockSell(Secret, T::AccountId),
+        UnlockSell(AcuitySecret, T::AccountId),
         /// A sell lock was timed out. \[hashed_secret\]
-        TimeoutSell(HashedSecret),
+        TimeoutSell(AcuityHashedSecret),
         /// A buy lock was created. \[hashed_secret, asset_id, order_id, seller, value, timeout\]
-        LockBuy(HashedSecret, AssetId, OrderId, T::AccountId, BalanceOf<T>, T::Moment),
+        LockBuy(AcuityHashedSecret, AcuityAssetId, AcuityOrderId, T::AccountId, BalanceOf<T>, T::Moment),
         /// A buy lock was unlocked. \[hashed_secret\]
-        UnlockBuy(HashedSecret),
+        UnlockBuy(AcuityHashedSecret),
         /// A buy lock was timed out. \[hashed_secret\]
-        TimeoutBuy(HashedSecret),
+        TimeoutBuy(AcuityHashedSecret),
 	}
 
 	#[pallet::error]
@@ -343,15 +343,15 @@ pub mod pallet {
 
     #[pallet::storage]
     #[pallet::getter(fn order_id_value)]
-    pub(super) type OrderIdValues<T: Config> = StorageMap<_, Blake2_128Concat, OrderId, BalanceOf<T>, ValueQuery>;
+    pub(super) type AcuityOrderIdValues<T: Config> = StorageMap<_, Blake2_128Concat, AcuityOrderId, BalanceOf<T>, ValueQuery>;
 
     #[pallet::storage]
     #[pallet::getter(fn sell_lock)]
-    pub(super) type SellLocks<T: Config> = StorageMap<_, Blake2_128Concat, HashedSecret, SellLock<BalanceOf<T>, T::Moment>, ValueQuery>;
+    pub(super) type SellLocks<T: Config> = StorageMap<_, Blake2_128Concat, AcuityHashedSecret, SellLock<BalanceOf<T>, T::Moment>, ValueQuery>;
 
     #[pallet::storage]
     #[pallet::getter(fn buy_lock)]
-    pub(super) type BuyLocks<T: Config> = StorageMap<_, Blake2_128Concat, HashedSecret, BuyLock<T::AccountId, BalanceOf<T>, T::Moment>, ValueQuery>;
+    pub(super) type BuyLocks<T: Config> = StorageMap<_, Blake2_128Concat, AcuityHashedSecret, BuyLock<T::AccountId, BalanceOf<T>, T::Moment>, ValueQuery>;
 }
 
 impl<T: Config> Pallet<T> {
@@ -363,8 +363,8 @@ impl<T: Config> Pallet<T> {
 		T::PalletId::get().into_sub_account(0)
 	}
 
-    pub fn get_order_id(seller: T::AccountId, asset_id: AssetId, price: u128, foreign_address: ForeignAddress) -> OrderId {
-        let mut order_id = OrderId::default();
+    pub fn get_order_id(seller: T::AccountId, asset_id: AcuityAssetId, price: u128, foreign_address: AcuityForeignAddress) -> AcuityOrderId {
+        let mut order_id = AcuityOrderId::default();
 		order_id.0.copy_from_slice(&blake2_128(&[seller.encode(), asset_id.encode(), price.to_ne_bytes().to_vec(), foreign_address.encode()].concat()));
         order_id
     }
