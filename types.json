@@ -1,0 +1,9 @@
+{
+  "AcuityOrderId": "[u8; 16]",
+  "AcuityAssetId": "[u8; 16]",
+  "AcuityForeignAddress": "[u8; 32]",
+  "AcuityHashedSecret": "[u8; 32]",
+  "AcuitySecret": "[u8; 32]",
+  "Timestamp": "u64",
+  "EthereumAddress": "[u8; 20]"
+}
