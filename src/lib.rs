@@ -268,7 +268,7 @@ pub mod pallet {
 
         #[pallet::weight(50_000_000)]
 		pub fn unlock_buy(origin: OriginFor<T>, secret: AcuitySecret) -> DispatchResultWithPostInfo {
-            let sender = ensure_signed(origin)?;
+            let _sender = ensure_signed(origin)?;
             let _now = <pallet_timestamp::Pallet<T>>::get();
             // Calculate hashed secret.
             let mut hashed_secret = AcuityHashedSecret::default();
