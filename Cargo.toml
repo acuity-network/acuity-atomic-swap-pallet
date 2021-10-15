@@ -29,6 +29,7 @@ pallet-balances = { default-features = false, git = 'https://github.com/parityte
 
 [dev-dependencies]
 serde = { version = "1.0.119" }
+hex = "0.4"
 
 [features]
 default = ['std']
