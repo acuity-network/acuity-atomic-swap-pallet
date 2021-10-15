@@ -7,7 +7,7 @@ use frame_support::{
 	traits::{Currency, Get},
     PalletId,
 };
-
+use scale_info::TypeInfo;
 use sp_io::hashing::{blake2_128, keccak_256};
 
 pub use pallet::*;
@@ -27,31 +27,31 @@ mod tests;
 /// An Order Id (i.e. 16 bytes).
 ///
 /// This gets serialized to the 0x-prefixed hex representation.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, Default, RuntimeDebug)]
+#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, Default, RuntimeDebug, TypeInfo)]
 pub struct AcuityOrderId([u8; 16]);
 
 /// An Asset Id (i.e. 16 bytes).
 ///
 /// This gets serialized to the 0x-prefixed hex representation.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, Default, RuntimeDebug)]
+#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, Default, RuntimeDebug, TypeInfo)]
 pub struct AcuityAssetId([u8; 16]);
 
 /// A Foreign Address (i.e. 32 bytes).
 ///
 /// This gets serialized to the 0x-prefixed hex representation.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, Default, RuntimeDebug)]
+#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, Default, RuntimeDebug, TypeInfo)]
 pub struct AcuityForeignAddress([u8; 32]);
 
 /// A hashed secret (i.e. 32 bytes).
 ///
 /// This gets serialized to the 0x-prefixed hex representation.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, Default, RuntimeDebug)]
+#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, Default, RuntimeDebug, TypeInfo)]
 pub struct AcuityHashedSecret([u8; 32]);
 
 /// A secret (i.e. 32 bytes).
 ///
 /// This gets serialized to the 0x-prefixed hex representation.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, Default, RuntimeDebug)]
+#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, Default, RuntimeDebug, TypeInfo)]
 pub struct AcuitySecret([u8; 32]);
 
 #[frame_support::pallet]
@@ -63,14 +63,14 @@ pub mod pallet {
     type BalanceOf<T> = <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
 
 
-    #[derive(Encode, Decode, Default, Clone, PartialEq)]
+    #[derive(Encode, Decode, Default, Clone, PartialEq, TypeInfo)]
     pub struct SellLock<Balance, Moment> {
         pub order_id: AcuityOrderId,
         pub value: Balance,
         pub timeout: Moment,
     }
 
-    #[derive(Encode, Decode, Default, Clone, PartialEq)]
+    #[derive(Encode, Decode, Default, Clone, PartialEq, TypeInfo)]
     pub struct BuyLock<AccountId, Balance, Moment> {
         pub seller: AccountId,
         pub value: Balance,
@@ -306,7 +306,6 @@ pub mod pallet {
 	}
 
 	#[pallet::event]
-	#[pallet::metadata(T::AccountId = "AccountId", BalanceOf<T> = "Balance", T::Moment = "Timestamp")]
 	#[pallet::generate_deposit(pub fn deposit_event)]
 	pub enum Event<T: Config> {
         /// Value was added to a sell order. \[seller, asset_id, price, foreign_address, value\]

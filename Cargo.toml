@@ -18,14 +18,15 @@ package = 'parity-scale-codec'
 version = '2.0.0'
 
 [dependencies]
-frame-support = { default-features = false, git = 'https://github.com/paritytech/substrate', branch = "polkadot-v0.9.9" }
-frame-system = { default-features = false, git = 'https://github.com/paritytech/substrate', branch = "polkadot-v0.9.9" }
-sp-std = { default-features = false, git = 'https://github.com/paritytech/substrate', branch = "polkadot-v0.9.9" }
-sp-runtime = { default-features = false, git = 'https://github.com/paritytech/substrate', branch = "polkadot-v0.9.9" }
-sp-io = { default-features = false, git = 'https://github.com/paritytech/substrate', branch = "polkadot-v0.9.9" }
-sp-core = { default-features = false, git = 'https://github.com/paritytech/substrate', branch = "polkadot-v0.9.9" }
-pallet-timestamp = { default-features = false, git = 'https://github.com/paritytech/substrate', branch = "polkadot-v0.9.9" }
-pallet-balances = { default-features = false, git = 'https://github.com/paritytech/substrate', branch = "polkadot-v0.9.9" }
+scale-info = { version = "1.0", default-features = false, features = ["derive"] }
+frame-support = { default-features = false, git = 'https://github.com/paritytech/substrate', branch = "polkadot-v0.9.11" }
+frame-system = { default-features = false, git = 'https://github.com/paritytech/substrate', branch = "polkadot-v0.9.11" }
+sp-std = { default-features = false, git = 'https://github.com/paritytech/substrate', branch = "polkadot-v0.9.11" }
+sp-runtime = { default-features = false, git = 'https://github.com/paritytech/substrate', branch = "polkadot-v0.9.11" }
+sp-io = { default-features = false, git = 'https://github.com/paritytech/substrate', branch = "polkadot-v0.9.11" }
+sp-core = { default-features = false, git = 'https://github.com/paritytech/substrate', branch = "polkadot-v0.9.11" }
+pallet-timestamp = { default-features = false, git = 'https://github.com/paritytech/substrate', branch = "polkadot-v0.9.11" }
+pallet-balances = { default-features = false, git = 'https://github.com/paritytech/substrate', branch = "polkadot-v0.9.11" }
 
 [dev-dependencies]
 serde = { version = "1.0.119" }
@@ -35,6 +36,7 @@ hex = "0.4"
 default = ['std']
 std = [
     'codec/std',
+    'scale-info/std',
     'frame-support/std',
     'frame-system/std',
     'sp-std/std',
