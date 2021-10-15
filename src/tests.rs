@@ -267,9 +267,10 @@ fn unlock_sell_fail_timed_out() {
 fn unlock_sell() {
 	new_test_ext().execute_with(|| {
         let price: u128 = 5;
-        let secret = AcuitySecret::default();
+        let mut secret = AcuitySecret::default();
+        secret.0.copy_from_slice(&hex::decode("4b1694df15172648181bcb37868b25d3bd9ff95d0f10ec150f783802a81a07fb").unwrap());
         let mut hashed_secret = AcuityHashedSecret::default();
-        hashed_secret.0.copy_from_slice(&keccak_256(&secret.encode()));
+        hashed_secret.0.copy_from_slice(&hex::decode("094cd46013683e3929f474bf04e9ff626a6d7332c195dfe014e4b4a3fbb3ea54").unwrap());
         let _now = <pallet_timestamp::Pallet<Test>>::get();
 		assert_ok!(AcuityAtomicSwap::add_to_order(Origin::signed(A), AcuityAssetId::default(), price, AcuityForeignAddress::default(), 50));
 
@@ -473,9 +474,10 @@ fn unlock_buy_fail_timed_out() {
 #[test]
 fn unlock_buy() {
 	new_test_ext().execute_with(|| {
-        let secret = AcuitySecret::default();
+        let mut secret = AcuitySecret::default();
+        secret.0.copy_from_slice(&hex::decode("4b1694df15172648181bcb37868b25d3bd9ff95d0f10ec150f783802a81a07fb").unwrap());
         let mut hashed_secret = AcuityHashedSecret::default();
-        hashed_secret.0.copy_from_slice(&keccak_256(&secret.encode()));
+        hashed_secret.0.copy_from_slice(&hex::decode("094cd46013683e3929f474bf04e9ff626a6d7332c195dfe014e4b4a3fbb3ea54").unwrap());
         let _now = <pallet_timestamp::Pallet<Test>>::get();
         assert_ok!(AcuityAtomicSwap::lock_buy(Origin::signed(B), hashed_secret, AcuityAssetId::default(), AcuityOrderId::default(), A, _now + 1000, 50));
 
