@@ -211,13 +211,13 @@ pub mod pallet {
         #[pallet::weight(50_000_000)]
 		pub fn unlock_sell(origin: OriginFor<T>, secret: AcuitySecret) -> DispatchResultWithPostInfo {
             let sender = ensure_signed(origin)?;
-			let _now = <pallet_timestamp::Pallet<T>>::get();
+			let now = <pallet_timestamp::Pallet<T>>::get();
             // Calculate hashed secret.
             let mut hashed_secret = AcuityHashedSecret::default();
             hashed_secret.0.copy_from_slice(&keccak_256(&secret.encode()));
             // Check sell lock has not timed out.
             let lock = <SellLocks<T>>::get(hashed_secret);
-            frame_support::ensure!(lock.timeout > _now, Error::<T>::LockTimedOut);
+            frame_support::ensure!(lock.timeout > now, Error::<T>::LockTimedOut);
             // Delete lock.
             <SellLocks<T>>::remove(hashed_secret);
             // Send the funds.
@@ -230,13 +230,13 @@ pub mod pallet {
         #[pallet::weight(50_000_000)]
 		pub fn timeout_sell(origin: OriginFor<T>, hashed_secret: AcuityHashedSecret, asset_id: AcuityAssetId, price: u128, foreign_address: AcuityForeignAddress) -> DispatchResultWithPostInfo {
             let sender = ensure_signed(origin)?;
-            let _now = <pallet_timestamp::Pallet<T>>::get();
+            let now = <pallet_timestamp::Pallet<T>>::get();
             // Calculate order_id.
             let order_id = Self::get_order_id(sender.clone(), asset_id, price, foreign_address);
             // Check order_id is correct and lock has timed out.
             let lock = <SellLocks<T>>::get(hashed_secret);
             frame_support::ensure!(lock.order_id == order_id, Error::<T>::WrongOrderId);
-            frame_support::ensure!(lock.timeout <= _now, Error::<T>::LockNotTimedOut);
+            frame_support::ensure!(lock.timeout <= now, Error::<T>::LockNotTimedOut);
             // Delete lock.
             <SellLocks<T>>::remove(hashed_secret);
             // Return funds to sell order.
@@ -269,13 +269,13 @@ pub mod pallet {
         #[pallet::weight(50_000_000)]
 		pub fn unlock_buy(origin: OriginFor<T>, secret: AcuitySecret) -> DispatchResultWithPostInfo {
             let _sender = ensure_signed(origin)?;
-            let _now = <pallet_timestamp::Pallet<T>>::get();
+            let now = <pallet_timestamp::Pallet<T>>::get();
             // Calculate hashed secret.
             let mut hashed_secret = AcuityHashedSecret::default();
             hashed_secret.0.copy_from_slice(&keccak_256(&secret.encode()));
             // Check lock has not timed out.
             let lock = <BuyLocks<T>>::get(hashed_secret);
-            frame_support::ensure!(lock.timeout > _now, Error::<T>::LockTimedOut);
+            frame_support::ensure!(lock.timeout > now, Error::<T>::LockTimedOut);
             // Delete lock.
             <BuyLocks<T>>::remove(hashed_secret);
             // Send the funds.
@@ -288,13 +288,13 @@ pub mod pallet {
         #[pallet::weight(50_000_000)]
 		pub fn timeout_buy(origin: OriginFor<T>, secret: AcuitySecret) -> DispatchResultWithPostInfo {
             let sender = ensure_signed(origin)?;
-            let _now = <pallet_timestamp::Pallet<T>>::get();
+            let now = <pallet_timestamp::Pallet<T>>::get();
             // Calculate hashed secret.
             let mut hashed_secret = AcuityHashedSecret::default();
             hashed_secret.0.copy_from_slice(&keccak_256(&secret.encode()));
             // Check lock has timed out.
             let lock = <BuyLocks<T>>::get(hashed_secret);
-            frame_support::ensure!(lock.timeout <= _now, Error::<T>::LockNotTimedOut);
+            frame_support::ensure!(lock.timeout <= now, Error::<T>::LockNotTimedOut);
             // Delete lock.
             <BuyLocks<T>>::remove(hashed_secret);
             // Send the funds.
