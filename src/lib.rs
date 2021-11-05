@@ -193,7 +193,7 @@ pub mod pallet {
             let order_total = <AcuityOrderIdValues<T>>::get(order_id);
             frame_support::ensure!(value <= order_total, Error::<T>::OrderTooSmall);
             // Ensure hashed secret is not already in use.
-            let lock = <SellLocks<T>>::get(hashed_secret);
+            let lock = <SellLocks<T>>::get(order_id, hashed_secret);
             frame_support::ensure!(TryInto::<u64>::try_into(lock.value).ok() == Some(0), Error::<T>::HashedSecretAlreadyInUse);
             // Move value into sell lock.
             <AcuityOrderIdValues<T>>::insert(order_id, order_total - value);
@@ -203,27 +203,27 @@ pub mod pallet {
                 value: value,
                 timeout: timeout,
             };
-            <SellLocks<T>>::insert(hashed_secret, sell_lock);
-            Self::deposit_event(Event::LockSell(hashed_secret, order_id, value, timeout));
+            <SellLocks<T>>::insert(order_id, hashed_secret, sell_lock);
+            Self::deposit_event(Event::LockSell(order_id, hashed_secret, timeout, value));
 			Ok(().into())
 		}
 
         #[pallet::weight(50_000_000)]
-		pub fn unlock_sell(origin: OriginFor<T>, secret: AcuitySecret) -> DispatchResultWithPostInfo {
+		pub fn unlock_sell(origin: OriginFor<T>, order_id: AcuityOrderId, secret: AcuitySecret) -> DispatchResultWithPostInfo {
             let sender = ensure_signed(origin)?;
 			let now = <pallet_timestamp::Pallet<T>>::get();
             // Calculate hashed secret.
             let mut hashed_secret = AcuityHashedSecret::default();
             hashed_secret.0.copy_from_slice(&keccak_256(&secret.encode()));
             // Check sell lock has not timed out.
-            let lock = <SellLocks<T>>::get(hashed_secret);
+            let lock = <SellLocks<T>>::get(order_id, hashed_secret);
             frame_support::ensure!(lock.timeout > now, Error::<T>::LockTimedOut);
             // Delete lock.
-            <SellLocks<T>>::remove(hashed_secret);
+            <SellLocks<T>>::remove(order_id, hashed_secret);
             // Send the funds.
             T::Currency::transfer(&Self::fund_account_id(), &sender, lock.value, AllowDeath)
             				.map_err(|_| DispatchError::Other("Can't transfer value."))?;
-            Self::deposit_event(Event::UnlockSell(secret, sender));
+            Self::deposit_event(Event::UnlockSell(order_id, secret, sender));
 			Ok(().into())
 		}
 
@@ -234,26 +234,26 @@ pub mod pallet {
             // Calculate order_id.
             let order_id = Self::get_order_id(sender.clone(), asset_id, price, foreign_address);
             // Check order_id is correct and lock has timed out.
-            let lock = <SellLocks<T>>::get(hashed_secret);
+            let lock = <SellLocks<T>>::get(order_id, hashed_secret);
             frame_support::ensure!(lock.order_id == order_id, Error::<T>::WrongOrderId);
             frame_support::ensure!(lock.timeout <= now, Error::<T>::LockNotTimedOut);
             // Delete lock.
-            <SellLocks<T>>::remove(hashed_secret);
+            <SellLocks<T>>::remove(order_id, hashed_secret);
             // Return funds to sell order.
             let order_total = <AcuityOrderIdValues<T>>::get(order_id);
             <AcuityOrderIdValues<T>>::insert(order_id, order_total + lock.value);
-            Self::deposit_event(Event::TimeoutSell(hashed_secret));
+            Self::deposit_event(Event::TimeoutSell(order_id, hashed_secret));
 			Ok(().into())
 		}
 
         #[pallet::weight(50_000_000)]
 		pub fn lock_buy(origin: OriginFor<T>, hashed_secret: AcuityHashedSecret, asset_id: AcuityAssetId, order_id: AcuityOrderId, seller: T::AccountId, timeout: T::Moment, value: BalanceOf<T>, ) -> DispatchResultWithPostInfo {
-            let sender = ensure_signed(origin)?;
+            let buyer = ensure_signed(origin)?;
             // Ensure hashed secret is not already in use.
-            let lock = <BuyLocks<T>>::get(hashed_secret);
+            let lock = <BuyLocks<T>>::get(&buyer, hashed_secret);
             frame_support::ensure!(TryInto::<u64>::try_into(lock.value).ok() == Some(0), Error::<T>::HashedSecretAlreadyInUse);
             // Move the value from the sender to the pallet.
-            T::Currency::transfer(&sender, &Self::fund_account_id(), value, AllowDeath)
+            T::Currency::transfer(&buyer, &Self::fund_account_id(), value, AllowDeath)
             				.map_err(|_| DispatchError::Other("Can't transfer value."))?;
             // Store lock data.
             let lock: BuyLock<T::AccountId, BalanceOf<T>, T::Moment> = BuyLock {
@@ -261,46 +261,47 @@ pub mod pallet {
                 value: value,
                 timeout: timeout,
             };
-            <BuyLocks<T>>::insert(hashed_secret, lock);
-            Self::deposit_event(Event::LockBuy(hashed_secret, asset_id, order_id, seller, value, timeout));
+            <BuyLocks<T>>::insert(&buyer, hashed_secret, lock);
+
+            Self::deposit_event(Event::LockBuy(buyer, seller, hashed_secret, timeout, value, asset_id, order_id));
 			Ok(().into())
 		}
 
         #[pallet::weight(50_000_000)]
-		pub fn unlock_buy(origin: OriginFor<T>, secret: AcuitySecret) -> DispatchResultWithPostInfo {
+		pub fn unlock_buy(origin: OriginFor<T>, buyer: T::AccountId, secret: AcuitySecret) -> DispatchResultWithPostInfo {
             let _sender = ensure_signed(origin)?;
             let now = <pallet_timestamp::Pallet<T>>::get();
             // Calculate hashed secret.
             let mut hashed_secret = AcuityHashedSecret::default();
             hashed_secret.0.copy_from_slice(&keccak_256(&secret.encode()));
             // Check lock has not timed out.
-            let lock = <BuyLocks<T>>::get(hashed_secret);
+            let lock = <BuyLocks<T>>::get(&buyer, hashed_secret);
             frame_support::ensure!(lock.timeout > now, Error::<T>::LockTimedOut);
             // Delete lock.
-            <BuyLocks<T>>::remove(hashed_secret);
+            <BuyLocks<T>>::remove(&buyer, hashed_secret);
             // Send the funds.
             T::Currency::transfer(&Self::fund_account_id(), &lock.seller, lock.value, AllowDeath)
             				.map_err(|_| DispatchError::Other("Can't transfer value."))?;
-            Self::deposit_event(Event::UnlockBuy(hashed_secret));
+            Self::deposit_event(Event::UnlockBuy(buyer, hashed_secret));
 			Ok(().into())
 		}
 
         #[pallet::weight(50_000_000)]
 		pub fn timeout_buy(origin: OriginFor<T>, secret: AcuitySecret) -> DispatchResultWithPostInfo {
-            let sender = ensure_signed(origin)?;
+            let buyer = ensure_signed(origin)?;
             let now = <pallet_timestamp::Pallet<T>>::get();
             // Calculate hashed secret.
             let mut hashed_secret = AcuityHashedSecret::default();
             hashed_secret.0.copy_from_slice(&keccak_256(&secret.encode()));
             // Check lock has timed out.
-            let lock = <BuyLocks<T>>::get(hashed_secret);
+            let lock = <BuyLocks<T>>::get(&buyer, hashed_secret);
             frame_support::ensure!(lock.timeout <= now, Error::<T>::LockNotTimedOut);
             // Delete lock.
-            <BuyLocks<T>>::remove(hashed_secret);
+            <BuyLocks<T>>::remove(&buyer, hashed_secret);
             // Send the funds.
-            T::Currency::transfer(&Self::fund_account_id(), &sender, lock.value, AllowDeath)
+            T::Currency::transfer(&Self::fund_account_id(), &buyer, lock.value, AllowDeath)
             				.map_err(|_| DispatchError::Other("Can't transfer value."))?;
-            Self::deposit_event(Event::TimeoutBuy(hashed_secret));
+            Self::deposit_event(Event::TimeoutBuy(buyer, hashed_secret));
 			Ok(().into())
 		}
 	}
@@ -312,18 +313,18 @@ pub mod pallet {
         AddToOrder(T::AccountId, AcuityAssetId, u128, AcuityForeignAddress, BalanceOf<T>),
         /// Value was removed from a sell order. \[seller, asset_id, price, foreign_address, value\]
         RemoveFromOrder(T::AccountId, AcuityAssetId, u128, AcuityForeignAddress, BalanceOf<T>),
-        /// A sell lock was created. \[hashed_secret, order_id, value, timeout\]
-        LockSell(AcuityHashedSecret, AcuityOrderId, BalanceOf<T>, T::Moment),
-        /// A sell lock was unlocked \[secret, buyer\]
-        UnlockSell(AcuitySecret, T::AccountId),
-        /// A sell lock was timed out. \[hashed_secret\]
-        TimeoutSell(AcuityHashedSecret),
-        /// A buy lock was created. \[hashed_secret, asset_id, order_id, seller, value, timeout\]
-        LockBuy(AcuityHashedSecret, AcuityAssetId, AcuityOrderId, T::AccountId, BalanceOf<T>, T::Moment),
-        /// A buy lock was unlocked. \[hashed_secret\]
-        UnlockBuy(AcuityHashedSecret),
-        /// A buy lock was timed out. \[hashed_secret\]
-        TimeoutBuy(AcuityHashedSecret),
+        /// A sell lock was created. \[order_id, hashed_secret, timeout, value\]
+        LockSell(AcuityOrderId, AcuityHashedSecret, T::Moment, BalanceOf<T>),
+        /// A sell lock was unlocked \[order_id, secret, buyer\]
+        UnlockSell(AcuityOrderId, AcuitySecret, T::AccountId),
+        /// A sell lock was timed out. \[order_id, hashed_secret\]
+        TimeoutSell(AcuityOrderId, AcuityHashedSecret),
+        /// A buy lock was created. \[buyer, seller, hashed_secret, timeout, value, asset_id, order_id\]
+        LockBuy(T::AccountId, T::AccountId, AcuityHashedSecret, T::Moment, BalanceOf<T>, AcuityAssetId, AcuityOrderId),
+        /// A buy lock was unlocked. \[buyer, hashed_secret\]
+        UnlockBuy(T::AccountId, AcuityHashedSecret),
+        /// A buy lock was timed out. \[buyer, hashed_secret\]
+        TimeoutBuy(T::AccountId, AcuityHashedSecret),
 	}
 
 	#[pallet::error]
@@ -346,11 +347,11 @@ pub mod pallet {
 
     #[pallet::storage]
     #[pallet::getter(fn sell_lock)]
-    pub(super) type SellLocks<T: Config> = StorageMap<_, Blake2_128Concat, AcuityHashedSecret, SellLock<BalanceOf<T>, T::Moment>, ValueQuery>;
+    pub(super) type SellLocks<T: Config> = StorageDoubleMap<_, Blake2_128Concat, AcuityOrderId, Blake2_128Concat, AcuityHashedSecret, SellLock<BalanceOf<T>, T::Moment>, ValueQuery>;
 
     #[pallet::storage]
     #[pallet::getter(fn buy_lock)]
-    pub(super) type BuyLocks<T: Config> = StorageMap<_, Blake2_128Concat, AcuityHashedSecret, BuyLock<T::AccountId, BalanceOf<T>, T::Moment>, ValueQuery>;
+    pub(super) type BuyLocks<T: Config> = StorageDoubleMap<_, Blake2_128Concat, T::AccountId, Blake2_128Concat, AcuityHashedSecret, BuyLock<T::AccountId, BalanceOf<T>, T::Moment>, ValueQuery>;
 }
 
 impl<T: Config> Pallet<T> {
