@@ -64,8 +64,9 @@ pub mod pallet {
 
 
     #[derive(Encode, Decode, Default, Clone, PartialEq, TypeInfo)]
-    pub struct SellLock<Balance, Moment> {
+    pub struct SellLock<AccountId, Balance, Moment> {
         pub order_id: AcuityOrderId,
+        pub buyer: AccountId,
         pub value: Balance,
         pub timeout: Moment,
     }
@@ -185,7 +186,7 @@ pub mod pallet {
 		}
 
         #[pallet::weight(50_000_000)]
-		pub fn lock_sell(origin: OriginFor<T>, hashed_secret: AcuityHashedSecret, asset_id: AcuityAssetId, price: u128, foreign_address: AcuityForeignAddress, value: BalanceOf<T>, timeout: T::Moment) -> DispatchResultWithPostInfo {
+		pub fn lock_sell(origin: OriginFor<T>, hashed_secret: AcuityHashedSecret, asset_id: AcuityAssetId, price: u128, foreign_address: AcuityForeignAddress, buyer: T::AccountId, value: BalanceOf<T>, timeout: T::Moment) -> DispatchResultWithPostInfo {
             let sender = ensure_signed(origin)?;
             // Calculate order_id.
             let order_id = Self::get_order_id(sender.clone(), asset_id, price, foreign_address);
@@ -198,8 +199,9 @@ pub mod pallet {
             // Move value into sell lock.
             <AcuityOrderIdValues<T>>::insert(order_id, order_total - value);
 
-            let sell_lock: SellLock<BalanceOf<T>, T::Moment> = SellLock {
+            let sell_lock: SellLock<T::AccountId, BalanceOf<T>, T::Moment> = SellLock {
                 order_id: order_id,
+                buyer: buyer,
                 value: value,
                 timeout: timeout,
             };
@@ -210,7 +212,7 @@ pub mod pallet {
 
         #[pallet::weight(50_000_000)]
 		pub fn unlock_sell(origin: OriginFor<T>, order_id: AcuityOrderId, secret: AcuitySecret) -> DispatchResultWithPostInfo {
-            let sender = ensure_signed(origin)?;
+            let _sender = ensure_signed(origin)?;
 			let now = <pallet_timestamp::Pallet<T>>::get();
             // Calculate hashed secret.
             let mut hashed_secret = AcuityHashedSecret::default();
@@ -221,9 +223,9 @@ pub mod pallet {
             // Delete lock.
             <SellLocks<T>>::remove(order_id, hashed_secret);
             // Send the funds.
-            T::Currency::transfer(&Self::fund_account_id(), &sender, lock.value, AllowDeath)
+            T::Currency::transfer(&Self::fund_account_id(), &lock.buyer, lock.value, AllowDeath)
             				.map_err(|_| DispatchError::Other("Can't transfer value."))?;
-            Self::deposit_event(Event::UnlockSell(order_id, secret, sender));
+            Self::deposit_event(Event::UnlockSell(order_id, secret, lock.buyer));
 			Ok(().into())
 		}
 
@@ -347,7 +349,7 @@ pub mod pallet {
 
     #[pallet::storage]
     #[pallet::getter(fn sell_lock)]
-    pub(super) type SellLocks<T: Config> = StorageDoubleMap<_, Blake2_128Concat, AcuityOrderId, Blake2_128Concat, AcuityHashedSecret, SellLock<BalanceOf<T>, T::Moment>, ValueQuery>;
+    pub(super) type SellLocks<T: Config> = StorageDoubleMap<_, Blake2_128Concat, AcuityOrderId, Blake2_128Concat, AcuityHashedSecret, SellLock<T::AccountId, BalanceOf<T>, T::Moment>, ValueQuery>;
 
     #[pallet::storage]
     #[pallet::getter(fn buy_lock)]
