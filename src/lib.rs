@@ -249,7 +249,7 @@ pub mod pallet {
 		}
 
         #[pallet::weight(50_000_000)]
-		pub fn lock_buy(origin: OriginFor<T>, hashed_secret: AcuityHashedSecret, asset_id: AcuityAssetId, order_id: AcuityOrderId, seller: T::AccountId, timeout: T::Moment, value: BalanceOf<T>, ) -> DispatchResultWithPostInfo {
+		pub fn lock_buy(origin: OriginFor<T>, hashed_secret: AcuityHashedSecret, asset_id: AcuityAssetId, order_id: AcuityOrderId, seller: T::AccountId, timeout: T::Moment, value: BalanceOf<T>, foreign_address: AcuityForeignAddress) -> DispatchResultWithPostInfo {
             let buyer = ensure_signed(origin)?;
             // Ensure hashed secret is not already in use.
             let lock = <BuyLocks<T>>::get(&buyer, hashed_secret);
@@ -265,7 +265,7 @@ pub mod pallet {
             };
             <BuyLocks<T>>::insert(&buyer, hashed_secret, lock);
 
-            Self::deposit_event(Event::LockBuy(buyer, seller, hashed_secret, timeout, value, asset_id, order_id));
+            Self::deposit_event(Event::LockBuy(buyer, seller, hashed_secret, timeout, value, asset_id, order_id, foreign_address));
 			Ok(().into())
 		}
 
@@ -321,8 +321,8 @@ pub mod pallet {
         UnlockSell(AcuityOrderId, AcuitySecret, T::AccountId),
         /// A sell lock was timed out. \[order_id, hashed_secret\]
         TimeoutSell(AcuityOrderId, AcuityHashedSecret),
-        /// A buy lock was created. \[buyer, seller, hashed_secret, timeout, value, asset_id, order_id\]
-        LockBuy(T::AccountId, T::AccountId, AcuityHashedSecret, T::Moment, BalanceOf<T>, AcuityAssetId, AcuityOrderId),
+        /// A buy lock was created. \[buyer, seller, hashed_secret, timeout, value, asset_id, order_id, foreign_address\]
+        LockBuy(T::AccountId, T::AccountId, AcuityHashedSecret, T::Moment, BalanceOf<T>, AcuityAssetId, AcuityOrderId, AcuityForeignAddress),
         /// A buy lock was unlocked. \[buyer, hashed_secret\]
         UnlockBuy(T::AccountId, AcuityHashedSecret),
         /// A buy lock was timed out. \[buyer, hashed_secret\]
