@@ -3,6 +3,7 @@
 use sp_std::prelude::*;
 use sp_runtime::{traits::AccountIdConversion, RuntimeDebug};
 use frame_support::{
+    pallet_prelude::MaxEncodedLen,
     traits::{ExistenceRequirement::AllowDeath},
 	traits::{Currency, Get},
     PalletId,
@@ -27,43 +28,43 @@ mod tests;
 /// An Order Id (i.e. 16 bytes).
 ///
 /// This gets serialized to the 0x-prefixed hex representation.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, Default, RuntimeDebug, TypeInfo)]
+#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, Default, RuntimeDebug, TypeInfo, MaxEncodedLen)]
 pub struct AcuityOrderId([u8; 16]);
 
 /// A Chain Id (i.e. 4 bytes).
 ///
 /// This gets serialized to the 0x-prefixed hex representation.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, Default, RuntimeDebug, TypeInfo)]
+#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, Default, RuntimeDebug, TypeInfo, MaxEncodedLen)]
 pub struct AcuityChainId(u32);
 
 /// An Adapter Id (i.e. 4 bytes).
 ///
 /// This gets serialized to the 0x-prefixed hex representation.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, Default, RuntimeDebug, TypeInfo)]
+#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, Default, RuntimeDebug, TypeInfo, MaxEncodedLen)]
 pub struct AcuityAdapterId(u32);
 
 /// An Asset Id (i.e. 8 bytes).
 ///
 /// This gets serialized to the 0x-prefixed hex representation.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, Default, RuntimeDebug, TypeInfo)]
+#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, Default, RuntimeDebug, TypeInfo, MaxEncodedLen)]
 pub struct AcuityAssetId([u8; 8]);
 
 /// A Foreign Address (i.e. 32 bytes).
 ///
 /// This gets serialized to the 0x-prefixed hex representation.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, Default, RuntimeDebug, TypeInfo)]
+#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, Default, RuntimeDebug, TypeInfo, MaxEncodedLen)]
 pub struct AcuityForeignAddress([u8; 32]);
 
 /// A hashed secret (i.e. 32 bytes).
 ///
 /// This gets serialized to the 0x-prefixed hex representation.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, Default, RuntimeDebug, TypeInfo)]
+#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, Default, RuntimeDebug, TypeInfo, MaxEncodedLen)]
 pub struct AcuityHashedSecret([u8; 32]);
 
 /// A secret (i.e. 32 bytes).
 ///
 /// This gets serialized to the 0x-prefixed hex representation.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, Default, RuntimeDebug, TypeInfo)]
+#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, Default, RuntimeDebug, TypeInfo, MaxEncodedLen)]
 pub struct AcuitySecret([u8; 32]);
 
 #[frame_support::pallet]
@@ -75,7 +76,7 @@ pub mod pallet {
     type BalanceOf<T> = <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
 
 
-    #[derive(Encode, Decode, Default, Clone, PartialEq, TypeInfo)]
+    #[derive(Encode, Decode, Default, Clone, PartialEq, TypeInfo, MaxEncodedLen, Debug)]
     pub struct SellLock<AccountId, Balance, Moment> {
         pub order_id: AcuityOrderId,
         pub buyer: AccountId,
@@ -83,7 +84,7 @@ pub mod pallet {
         pub timeout: Moment,
     }
 
-    #[derive(Encode, Decode, Default, Clone, PartialEq, TypeInfo)]
+    #[derive(Encode, Decode, Default, Clone, PartialEq, TypeInfo, MaxEncodedLen, Debug)]
     pub struct BuyLock<AccountId, Balance, Moment> {
         pub seller: AccountId,
         pub value: Balance,
@@ -206,8 +207,10 @@ pub mod pallet {
             let order_total = <AcuityOrderIdValues<T>>::get(order_id);
             frame_support::ensure!(value <= order_total, Error::<T>::OrderTooSmall);
             // Ensure hashed secret is not already in use.
-            let lock = <SellLocks<T>>::get(order_id, hashed_secret);
-            frame_support::ensure!(TryInto::<u64>::try_into(lock.value).ok() == Some(0), Error::<T>::HashedSecretAlreadyInUse);
+            ensure!(
+				!SellLocks::<T>::contains_key(order_id, hashed_secret),
+				Error::<T>::HashedSecretAlreadyInUse
+			);
             // Move value into sell lock.
             <AcuityOrderIdValues<T>>::insert(order_id, order_total - value);
 
@@ -217,7 +220,7 @@ pub mod pallet {
                 value: value,
                 timeout: timeout,
             };
-            <SellLocks<T>>::insert(order_id, hashed_secret, sell_lock);
+            SellLocks::<T>::insert(order_id, hashed_secret, sell_lock);
             Self::deposit_event(Event::LockSell(order_id, hashed_secret, timeout, value));
 			Ok(().into())
 		}
@@ -230,10 +233,10 @@ pub mod pallet {
             let mut hashed_secret = AcuityHashedSecret::default();
             hashed_secret.0.copy_from_slice(&keccak_256(&secret.encode()));
             // Check sell lock has not timed out.
-            let lock = <SellLocks<T>>::get(order_id, hashed_secret);
+            let lock = SellLocks::<T>::get(order_id, hashed_secret).ok_or(Error::<T>::LockNotFound)?;
             frame_support::ensure!(lock.timeout > now, Error::<T>::LockTimedOut);
             // Delete lock.
-            <SellLocks<T>>::remove(order_id, hashed_secret);
+            SellLocks::<T>::remove(order_id, hashed_secret);
             // Send the funds.
             T::Currency::transfer(&Self::fund_account_id(), &lock.buyer, lock.value, AllowDeath)
             				.map_err(|_| DispatchError::Other("Can't transfer value."))?;
@@ -248,11 +251,11 @@ pub mod pallet {
             // Calculate order_id.
             let order_id = Self::get_order_id(sender.clone(), chain_id, adapter_id, asset_id, price, foreign_address);
             // Check order_id is correct and lock has timed out.
-            let lock = <SellLocks<T>>::get(order_id, hashed_secret);
+            let lock = SellLocks::<T>::get(order_id, hashed_secret).ok_or(Error::<T>::LockNotFound)?;
             frame_support::ensure!(lock.order_id == order_id, Error::<T>::WrongOrderId);
             frame_support::ensure!(lock.timeout <= now, Error::<T>::LockNotTimedOut);
             // Delete lock.
-            <SellLocks<T>>::remove(order_id, hashed_secret);
+            SellLocks::<T>::remove(order_id, hashed_secret);
             // Return funds to sell order.
             let order_total = <AcuityOrderIdValues<T>>::get(order_id);
             <AcuityOrderIdValues<T>>::insert(order_id, order_total + lock.value);
@@ -264,8 +267,10 @@ pub mod pallet {
 		pub fn lock_buy(origin: OriginFor<T>, hashed_secret: AcuityHashedSecret, chain_id: AcuityChainId, adapter_id: AcuityAdapterId, order_id: AcuityOrderId, seller: T::AccountId, timeout: T::Moment, value: BalanceOf<T>, foreign_address: AcuityForeignAddress) -> DispatchResultWithPostInfo {
             let buyer = ensure_signed(origin)?;
             // Ensure hashed secret is not already in use.
-            let lock = <BuyLocks<T>>::get(&buyer, hashed_secret);
-            frame_support::ensure!(TryInto::<u64>::try_into(lock.value).ok() == Some(0), Error::<T>::HashedSecretAlreadyInUse);
+            ensure!(
+				!BuyLocks::<T>::contains_key(&buyer, hashed_secret),
+				Error::<T>::HashedSecretAlreadyInUse
+			);
             // Move the value from the sender to the pallet.
             T::Currency::transfer(&buyer, &Self::fund_account_id(), value, AllowDeath)
             				.map_err(|_| DispatchError::Other("Can't transfer value."))?;
@@ -289,7 +294,7 @@ pub mod pallet {
             let mut hashed_secret = AcuityHashedSecret::default();
             hashed_secret.0.copy_from_slice(&keccak_256(&secret.encode()));
             // Check lock has not timed out.
-            let lock = <BuyLocks<T>>::get(&buyer, hashed_secret);
+            let lock = <BuyLocks<T>>::get(&buyer, hashed_secret).ok_or(Error::<T>::LockNotFound)?;
             frame_support::ensure!(lock.timeout > now, Error::<T>::LockTimedOut);
             // Delete lock.
             <BuyLocks<T>>::remove(&buyer, hashed_secret);
@@ -308,7 +313,7 @@ pub mod pallet {
             let mut hashed_secret = AcuityHashedSecret::default();
             hashed_secret.0.copy_from_slice(&keccak_256(&secret.encode()));
             // Check lock has timed out.
-            let lock = <BuyLocks<T>>::get(&buyer, hashed_secret);
+            let lock = <BuyLocks<T>>::get(&buyer, hashed_secret).ok_or(Error::<T>::LockNotFound)?;
             frame_support::ensure!(lock.timeout <= now, Error::<T>::LockNotTimedOut);
             // Delete lock.
             <BuyLocks<T>>::remove(&buyer, hashed_secret);
@@ -348,6 +353,8 @@ pub mod pallet {
         /// The order ID is incorrect.
         WrongOrderId,
         /// The lock has timed out.
+        LockNotFound,
+        /// The lock has timed out.
         LockTimedOut,
         /// The lock has not timed out.
         LockNotTimedOut,
@@ -361,11 +368,19 @@ pub mod pallet {
 
     #[pallet::storage]
     #[pallet::getter(fn sell_lock)]
-    pub(super) type SellLocks<T: Config> = StorageDoubleMap<_, Blake2_128Concat, AcuityOrderId, Blake2_128Concat, AcuityHashedSecret, SellLock<T::AccountId, BalanceOf<T>, T::Moment>, ValueQuery>;
+    pub(super) type SellLocks<T: Config> = StorageDoubleMap<_,
+        Blake2_128Concat, AcuityOrderId,
+        Blake2_128Concat, AcuityHashedSecret,
+        SellLock<T::AccountId, BalanceOf<T>, T::Moment>
+    >;
 
     #[pallet::storage]
     #[pallet::getter(fn buy_lock)]
-    pub(super) type BuyLocks<T: Config> = StorageDoubleMap<_, Blake2_128Concat, T::AccountId, Blake2_128Concat, AcuityHashedSecret, BuyLock<T::AccountId, BalanceOf<T>, T::Moment>, ValueQuery>;
+    pub(super) type BuyLocks<T: Config> = StorageDoubleMap<_,
+        Blake2_128Concat, T::AccountId,
+        Blake2_128Concat, AcuityHashedSecret,
+        BuyLock<T::AccountId, BalanceOf<T>, T::Moment>
+    >;
 }
 
 impl<T: Config> Pallet<T> {
@@ -374,7 +389,7 @@ impl<T: Config> Pallet<T> {
 	/// This actually does computation. If you need to keep using it, then make sure you cache the
 	/// value and only call this once.
 	pub fn fund_account_id() -> T::AccountId {
-		T::PalletId::get().into_sub_account(0)
+		T::PalletId::get().into_account_truncating()
 	}
 
     pub fn get_order_id(seller: T::AccountId, chain_id: AcuityChainId, adapter_id: AcuityAdapterId, asset_id: AcuityAssetId, price: u128, foreign_address: AcuityForeignAddress) -> AcuityOrderId {
