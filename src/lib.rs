@@ -25,29 +25,17 @@ mod mock;
 #[cfg(test)]
 mod tests;
 
-/// An Order Id (i.e. 16 bytes).
-///
-/// This gets serialized to the 0x-prefixed hex representation.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, Default, RuntimeDebug, TypeInfo, MaxEncodedLen)]
-pub struct AcuityOrderId([u8; 16]);
-
-/// A Chain Id (i.e. 4 bytes).
-///
-/// This gets serialized to the 0x-prefixed hex representation.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, Default, RuntimeDebug, TypeInfo, MaxEncodedLen)]
-pub struct AcuityChainId(u32);
-
-/// An Adapter Id (i.e. 4 bytes).
-///
-/// This gets serialized to the 0x-prefixed hex representation.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, Default, RuntimeDebug, TypeInfo, MaxEncodedLen)]
-pub struct AcuityAdapterId(u32);
-
 /// An Asset Id (i.e. 8 bytes).
 ///
 /// This gets serialized to the 0x-prefixed hex representation.
 #[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, Default, RuntimeDebug, TypeInfo, MaxEncodedLen)]
-pub struct AcuityAssetId([u8; 8]);
+pub struct AcuityAssetId([u8; 16]);
+
+/// A lock ID (i.e. 32 bytes).
+///
+/// This gets serialized to the 0x-prefixed hex representation.
+#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, Default, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+pub struct AcuityLockId([u8; 32]);
 
 /// A Foreign Address (i.e. 32 bytes).
 ///
@@ -78,7 +66,6 @@ pub mod pallet {
 
     #[derive(Encode, Decode, Default, Clone, PartialEq, TypeInfo, MaxEncodedLen, Debug)]
     pub struct SellLock<AccountId, Balance, Moment> {
-        pub order_id: AcuityOrderId,
         pub buyer: AccountId,
         pub value: Balance,
         pub timeout: Moment,
@@ -112,6 +99,7 @@ pub mod pallet {
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
 
+/*
 		#[pallet::weight(50_000_000)]
 		pub fn add_to_order(origin: OriginFor<T>, chain_id: AcuityChainId, adapter_id: AcuityAdapterId, asset_id: AcuityAssetId, price: u128, foreign_address: AcuityForeignAddress, value: BalanceOf<T>) -> DispatchResultWithPostInfo {
             let sender = ensure_signed(origin)?;
@@ -323,11 +311,12 @@ pub mod pallet {
             Self::deposit_event(Event::TimeoutBuy(buyer, hashed_secret));
 			Ok(().into())
 		}
+        */
 	}
-
 	#[pallet::event]
 	#[pallet::generate_deposit(pub fn deposit_event)]
 	pub enum Event<T: Config> {
+        /*
         /// Value was added to a sell order. \[seller, chain_id, adapter_id, asset_id, price, foreign_address, value\]
         AddToOrder(T::AccountId, AcuityChainId, AcuityAdapterId, AcuityAssetId, u128, AcuityForeignAddress, BalanceOf<T>),
         /// Value was removed from a sell order. \[seller, chain_id, adapter_id, asset_id, price, foreign_address, value\]
@@ -344,6 +333,7 @@ pub mod pallet {
         UnlockBuy(T::AccountId, AcuityHashedSecret),
         /// A buy lock was timed out. \[buyer, hashed_secret\]
         TimeoutBuy(T::AccountId, AcuityHashedSecret),
+        */
 	}
 
 	#[pallet::error]
@@ -363,23 +353,26 @@ pub mod pallet {
 	}
 
     #[pallet::storage]
-    #[pallet::getter(fn order_id_value)]
-    pub(super) type AcuityOrderIdValues<T: Config> = StorageMap<_, Blake2_128Concat, AcuityOrderId, BalanceOf<T>, ValueQuery>;
-
-    #[pallet::storage]
-    #[pallet::getter(fn sell_lock)]
-    pub(super) type SellLocks<T: Config> = StorageDoubleMap<_,
-        Blake2_128Concat, AcuityOrderId,
-        Blake2_128Concat, AcuityHashedSecret,
-        SellLock<T::AccountId, BalanceOf<T>, T::Moment>
+    #[pallet::getter(fn stash_ll)]
+    pub(super) type StashLL<T: Config> = StorageDoubleMap<_,
+        Blake2_128Concat, AcuityAssetId,
+        Blake2_128Concat, T::AccountId,
+        T::AccountId
     >;
 
     #[pallet::storage]
-    #[pallet::getter(fn buy_lock)]
-    pub(super) type BuyLocks<T: Config> = StorageDoubleMap<_,
+    #[pallet::getter(fn stash_value)]
+    pub(super) type StashValue<T: Config> = StorageDoubleMap<_,
+        Blake2_128Concat, AcuityAssetId,
         Blake2_128Concat, T::AccountId,
-        Blake2_128Concat, AcuityHashedSecret,
-        BuyLock<T::AccountId, BalanceOf<T>, T::Moment>
+        BalanceOf<T>, ValueQuery
+    >;
+
+    #[pallet::storage]
+    #[pallet::getter(fn lock_id_value)]
+    pub(super) type AcuityLockIdValue<T: Config> = StorageMap<_,
+        Blake2_128Concat, AcuityLockId,
+        BalanceOf<T>, ValueQuery
     >;
 }
 
@@ -391,11 +384,5 @@ impl<T: Config> Pallet<T> {
 	pub fn fund_account_id() -> T::AccountId {
 		T::PalletId::get().into_account_truncating()
 	}
-
-    pub fn get_order_id(seller: T::AccountId, chain_id: AcuityChainId, adapter_id: AcuityAdapterId, asset_id: AcuityAssetId, price: u128, foreign_address: AcuityForeignAddress) -> AcuityOrderId {
-        let mut order_id = AcuityOrderId::default();
-		order_id.0.copy_from_slice(&blake2_128(&[seller.encode(), chain_id.encode(), adapter_id.encode(), asset_id.encode(), price.to_ne_bytes().to_vec(), foreign_address.encode()].concat()));
-        order_id
-    }
 
 }
