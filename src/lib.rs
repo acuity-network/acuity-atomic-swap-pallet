@@ -465,7 +465,7 @@ impl<T: Config> Pallet<T> {
             }
             else {
                 // Remove sender from current position.
-                let next =  <StashLL<T>>::get(asset_id, &account).unwrap();
+                let next = <StashLL<T>>::get(asset_id, &account).unwrap();
                 <StashLL<T>>::insert(asset_id, old_prev, next);
             }
             if !replace {
@@ -482,6 +482,56 @@ impl<T: Config> Pallet<T> {
 
 	}
 
-    pub fn stash_remove() {
+    pub fn stash_remove(asset_id: AcuityAssetId, account: T::AccountId, value: BalanceOf<T>) {
+        let zero_account_id = T::AccountId::decode(&mut TrailingZeroInput::zeroes()).unwrap();
+        // Get new total.
+        let total = <StashValue<T>>::get(asset_id, &account) - value;
+        // Search for old previous.
+        let mut old_prev = zero_account_id.clone();
+        loop {
+            let next = match <StashLL<T>>::get(asset_id, &old_prev) {
+                Some(p) => p,
+                None => break,
+            };
+            if next == account {
+                break;
+            }
+            old_prev = next;
+        }
+        // Is there still a stash?
+        if !total.is_zero() {
+            // Search for new previous.
+            let mut prev = zero_account_id;
+            loop {
+                let next = match <StashLL<T>>::get(asset_id, &prev) {
+                    Some(p) => p,
+                    None => break,
+                };
+                let value = <StashValue<T>>::get(asset_id, &next);
+                if value < total {
+                    break;
+                }
+                prev = next;
+            }
+            // Is it in a new position?
+            if prev != account {
+                // Remove sender from old position.
+                let next = <StashLL<T>>::get(asset_id, &account).unwrap();
+                <StashLL<T>>::insert(asset_id, old_prev, next);
+                // Insert into new position.
+                let next = <StashLL<T>>::get(asset_id, &prev).unwrap();
+                <StashLL<T>>::insert(asset_id, &account, next);
+                <StashLL<T>>::insert(asset_id, &prev, &account);
+            }
+        }
+        else {
+            // Remove sender from current position.
+            let next = <StashLL<T>>::get(asset_id, &account).unwrap();
+            <StashLL<T>>::insert(asset_id, old_prev, next);
+        }
+        // Update the value deposited.
+        <StashValue<T>>::insert(asset_id, &account, total);
+        // Log info.
+//        emit StashRemove(msg.sender, assetId, value);
 	}
 }
