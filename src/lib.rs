@@ -9,13 +9,23 @@ use frame_support::{
     PalletId,
 };
 use scale_info::TypeInfo;
-use sp_io::hashing::{blake2_128, keccak_256};
+//use sp_io::hashing::{blake2_128, keccak_256};
+
+use std::default::Default;
 
 pub use pallet::*;
 
 use sp_std::{
 	convert::TryInto,
 };
+
+
+use sp_runtime::{
+	traits::{
+		Zero, TrailingZeroInput
+	},
+};
+
 
 use codec::{Encode, Decode};
 
@@ -55,13 +65,14 @@ pub struct AcuityHashedSecret([u8; 32]);
 #[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, Default, RuntimeDebug, TypeInfo, MaxEncodedLen)]
 pub struct AcuitySecret([u8; 32]);
 
+type BalanceOf<T> = <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
+
 #[frame_support::pallet]
 pub mod pallet {
 	use frame_support::pallet_prelude::*;
 	use frame_system::pallet_prelude::*;
 	use super::*;
 
-    type BalanceOf<T> = <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
 
 
     #[derive(Encode, Decode, Default, Clone, PartialEq, TypeInfo, MaxEncodedLen, Debug)]
@@ -99,6 +110,35 @@ pub mod pallet {
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
 
+
+        #[pallet::weight(50_000_000)]
+        pub fn deposit_stash(origin: OriginFor<T>, asset_id: AcuityAssetId, value: BalanceOf<T>) -> DispatchResultWithPostInfo {
+            let sender = ensure_signed(origin)?;
+            // Ensure value is nonzero.
+            frame_support::ensure!(!value.is_zero(), Error::<T>::ZeroValue);
+            // Move the value from the sender to the pallet.
+            T::Currency::transfer(&sender, &Self::fund_account_id(), value, AllowDeath)
+            				.map_err(|_| DispatchError::Other("Can't transfer value."))?;
+
+            Self::stash_add(asset_id, sender, value);
+            Ok(().into())
+        }
+/*
+        #[pallet::weight(50_000_000)]
+        pub fn move_stash(origin: OriginFor<T>, from_asset_id: AcuityAssetId, to_asset_id: AcuityAssetId, value: BalanceOf<T>) -> DispatchResultWithPostInfo {
+            Ok(().into())
+        }
+
+        #[pallet::weight(50_000_000)]
+        pub fn withdraw_stash(origin: OriginFor<T>, asset_id: AcuityAssetId, value: BalanceOf<T>) -> DispatchResultWithPostInfo {
+            Ok(().into())
+        }
+
+        #[pallet::weight(50_000_000)]
+        pub fn withdraw_stash_all(origin: OriginFor<T>, asset_id: AcuityAssetId) -> DispatchResultWithPostInfo {
+            Ok(().into())
+        }
+*/
 /*
 		#[pallet::weight(50_000_000)]
 		pub fn add_to_order(origin: OriginFor<T>, chain_id: AcuityChainId, adapter_id: AcuityAdapterId, asset_id: AcuityAssetId, price: u128, foreign_address: AcuityForeignAddress, value: BalanceOf<T>) -> DispatchResultWithPostInfo {
@@ -338,6 +378,8 @@ pub mod pallet {
 
 	#[pallet::error]
 	pub enum Error<T> {
+        /// Value must not be zero.
+        ZeroValue,
         /// The order has too little value.
         OrderTooSmall,
         /// The order ID is incorrect.
@@ -385,4 +427,61 @@ impl<T: Config> Pallet<T> {
 		T::PalletId::get().into_account_truncating()
 	}
 
+    pub fn stash_add(asset_id: AcuityAssetId, account: T::AccountId, value: BalanceOf<T>) {
+        let zero_account_id = T::AccountId::decode(&mut TrailingZeroInput::zeroes()).unwrap();
+        // Get new total.
+        let total = <StashValue<T>>::get(asset_id, &account) + value;
+        // Search for new previous.
+        let mut prev = zero_account_id.clone();
+        loop {
+            let next = match <StashLL<T>>::get(asset_id, &prev) {
+                Some(p) => p,
+                None => break,
+            };
+            let value = <StashValue<T>>::get(asset_id, &next);
+            if value < total {
+                break;
+            }
+            prev = next;
+        }
+        let mut replace = false;
+        // Is sender already in the list?
+        if !<StashValue<T>>::get(asset_id, &account).is_zero() {
+            // Search for old previous.
+            let mut old_prev = zero_account_id;
+            loop {
+                let next = match <StashLL<T>>::get(asset_id, &old_prev) {
+                    Some(p) => p,
+                    None => break,
+                };
+                if next == account {
+                    break;
+                }
+                old_prev = next;
+            }
+            // Is it in the same position?
+            if prev == old_prev {
+                replace = true;
+            }
+            else {
+                // Remove sender from current position.
+                let next =  <StashLL<T>>::get(asset_id, &account).unwrap();
+                <StashLL<T>>::insert(asset_id, old_prev, next);
+            }
+            if !replace {
+                // Insert into linked list.
+                let next = <StashLL<T>>::get(asset_id, &prev).unwrap();
+                <StashLL<T>>::insert(asset_id, &account, next);
+                <StashLL<T>>::insert(asset_id, &prev, &account);
+            }
+            // Update the value deposited.
+            <StashValue<T>>::insert(asset_id, &account, total);
+            // Log info.
+//            emit StashAdd(msg.sender, assetId, value);
+        }
+
+	}
+
+    pub fn stash_remove() {
+	}
 }
