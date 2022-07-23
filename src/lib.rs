@@ -9,7 +9,7 @@ use frame_support::{
     PalletId,
 };
 use scale_info::TypeInfo;
-//use sp_io::hashing::{blake2_128, keccak_256};
+use sp_io::hashing::{blake2_128, keccak_256};
 
 use std::default::Default;
 
@@ -47,12 +47,6 @@ pub struct AcuityAssetId([u8; 16]);
 #[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, Default, RuntimeDebug, TypeInfo, MaxEncodedLen)]
 pub struct AcuityLockId([u8; 32]);
 
-/// A Foreign Address (i.e. 32 bytes).
-///
-/// This gets serialized to the 0x-prefixed hex representation.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, Default, RuntimeDebug, TypeInfo, MaxEncodedLen)]
-pub struct AcuityForeignAddress([u8; 32]);
-
 /// A hashed secret (i.e. 32 bytes).
 ///
 /// This gets serialized to the 0x-prefixed hex representation.
@@ -73,8 +67,6 @@ pub mod pallet {
 	use frame_system::pallet_prelude::*;
 	use super::*;
 
-
-
     #[derive(Encode, Decode, Default, Clone, PartialEq, TypeInfo, MaxEncodedLen, Debug)]
     pub struct SellLock<AccountId, Balance, Moment> {
         pub buyer: AccountId,
@@ -93,7 +85,6 @@ pub mod pallet {
 	#[pallet::generate_store(trait Store)]
 	pub struct Pallet<T>(PhantomData<T>);
 
-
 	#[pallet::config]
     pub trait Config: pallet_timestamp::Config + frame_system::Config {
         /// PalletId for the crowdloan pallet. An appropriate value could be ```PalletId(*b"py/cfund")```
@@ -110,7 +101,6 @@ pub mod pallet {
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
 
-
         #[pallet::weight(50_000_000)]
         pub fn deposit_stash(origin: OriginFor<T>, asset_id: AcuityAssetId, value: BalanceOf<T>) -> DispatchResultWithPostInfo {
             let sender = ensure_signed(origin)?;
@@ -123,235 +113,184 @@ pub mod pallet {
             Self::stash_add(asset_id, sender, value);
             Ok(().into())
         }
-/*
+
         #[pallet::weight(50_000_000)]
         pub fn move_stash(origin: OriginFor<T>, from_asset_id: AcuityAssetId, to_asset_id: AcuityAssetId, value: BalanceOf<T>) -> DispatchResultWithPostInfo {
+            let sender = ensure_signed(origin)?;
+            // Get current stash size.
+            let stash_value = <StashValue<T>>::get(from_asset_id, &sender);
+            // Check there is enough.
+            frame_support::ensure!(stash_value >= value, Error::<T>::StashNotBigEnough);
+            // Move the deposit.
+            Self::stash_remove(from_asset_id, sender.clone(), value);
+            Self::stash_add(to_asset_id, sender, value);
             Ok(().into())
         }
 
         #[pallet::weight(50_000_000)]
         pub fn withdraw_stash(origin: OriginFor<T>, asset_id: AcuityAssetId, value: BalanceOf<T>) -> DispatchResultWithPostInfo {
+            let sender = ensure_signed(origin)?;
+            // Check there is enough.
+            frame_support::ensure!(<StashValue<T>>::get(asset_id, &sender) >= value, Error::<T>::StashNotBigEnough);
+            // Remove the deposit.
+            Self::stash_remove(asset_id, sender.clone(), value);
+            // Send the funds back.
+            T::Currency::transfer(&Self::fund_account_id(), &sender, value, AllowDeath)
+            				.map_err(|_| DispatchError::Other("Can't transfer value."))?;
             Ok(().into())
         }
 
         #[pallet::weight(50_000_000)]
         pub fn withdraw_stash_all(origin: OriginFor<T>, asset_id: AcuityAssetId) -> DispatchResultWithPostInfo {
+            let sender = ensure_signed(origin)?;
+            // Get current stash size.
+            let stash_value = <StashValue<T>>::get(asset_id, &sender);
+            // Remove the deposit.
+            Self::stash_remove(asset_id, sender.clone(), stash_value);
+            // Send the funds back.
+            T::Currency::transfer(&Self::fund_account_id(), &sender, stash_value, AllowDeath)
+            				.map_err(|_| DispatchError::Other("Can't transfer value."))?;
             Ok(().into())
         }
-*/
-/*
-		#[pallet::weight(50_000_000)]
-		pub fn add_to_order(origin: OriginFor<T>, chain_id: AcuityChainId, adapter_id: AcuityAdapterId, asset_id: AcuityAssetId, price: u128, foreign_address: AcuityForeignAddress, value: BalanceOf<T>) -> DispatchResultWithPostInfo {
-            let sender = ensure_signed(origin)?;
-            // Calculate order_id.
-            let order_id = Self::get_order_id(sender.clone(), chain_id, adapter_id, asset_id, price, foreign_address);
-            // Move the value from the sender to the pallet.
-            T::Currency::transfer(&sender, &Self::fund_account_id(), value, AllowDeath)
-            				.map_err(|_| DispatchError::Other("Can't transfer value."))?;
-            // Add value to order.
-            let order_total = <AcuityOrderIdValues<T>>::get(order_id);
-            <AcuityOrderIdValues<T>>::insert(order_id, order_total + value);
-            Self::deposit_event(Event::AddToOrder(sender, chain_id, adapter_id, asset_id, price, foreign_address, value));
-			Ok(().into())
-		}
 
         #[pallet::weight(50_000_000)]
-		pub fn change_order(origin: OriginFor<T>, old_chain_id: AcuityChainId, old_adapter_id: AcuityAdapterId, old_asset_id: AcuityAssetId, old_price: u128, old_foreign_address: AcuityForeignAddress,
-            new_chain_id: AcuityChainId, new_adapter_id: AcuityAdapterId, new_asset_id: AcuityAssetId, new_price: u128, new_foreign_address: AcuityForeignAddress, value: BalanceOf<T>) -> DispatchResultWithPostInfo
-        {
-            let sender = ensure_signed(origin)?;
-            // Calculate order_ids.
-            let old_order_id = Self::get_order_id(sender.clone(), old_chain_id, old_adapter_id, old_asset_id, old_price, old_foreign_address);
-            let new_order_id = Self::get_order_id(sender.clone(), new_chain_id, new_adapter_id, new_asset_id, new_price, new_foreign_address);
-            // Transfer value.
-            let order_value = <AcuityOrderIdValues<T>>::get(old_order_id);
-            frame_support::ensure!(value <= order_value, Error::<T>::OrderTooSmall);
-            <AcuityOrderIdValues<T>>::insert(old_order_id, order_value - value);
-            let order_value = <AcuityOrderIdValues<T>>::get(new_order_id);
-            <AcuityOrderIdValues<T>>::insert(new_order_id, order_value + value);
-            // Log info.
-            Self::deposit_event(Event::RemoveFromOrder(sender.clone(), old_chain_id, old_adapter_id, old_asset_id, old_price, old_foreign_address, value));
-            Self::deposit_event(Event::AddToOrder(sender, new_chain_id, new_adapter_id, new_asset_id, new_price, new_foreign_address, value));
-			Ok(().into())
-		}
-
-        #[pallet::weight(50_000_000)]
-        pub fn change_order_all(origin: OriginFor<T>, old_chain_id: AcuityChainId, old_adapter_id: AcuityAdapterId, old_asset_id: AcuityAssetId, old_price: u128, old_foreign_address: AcuityForeignAddress,
-            new_chain_id: AcuityChainId, new_adapter_id: AcuityAdapterId, new_asset_id: AcuityAssetId, new_price: u128, new_foreign_address: AcuityForeignAddress) -> DispatchResultWithPostInfo
-        {
-            let sender = ensure_signed(origin)?;
-            // Calculate order_ids.
-            let old_order_id = Self::get_order_id(sender.clone(), old_chain_id, old_adapter_id, old_asset_id, old_price, old_foreign_address);
-            let new_order_id = Self::get_order_id(sender.clone(), new_chain_id, new_adapter_id, new_asset_id, new_price, new_foreign_address);
-            // Transfer value.
-            let old_order_value = <AcuityOrderIdValues<T>>::get(old_order_id);
-            <AcuityOrderIdValues<T>>::remove(old_order_id);
-            let new_order_value = <AcuityOrderIdValues<T>>::get(new_order_id);
-            <AcuityOrderIdValues<T>>::insert(new_order_id, old_order_value + new_order_value);
-            // Log info.
-            Self::deposit_event(Event::RemoveFromOrder(sender.clone(), old_chain_id, old_adapter_id, old_asset_id, old_price, old_foreign_address, old_order_value));
-            Self::deposit_event(Event::AddToOrder(sender, new_chain_id, new_adapter_id, new_asset_id, new_price, new_foreign_address, old_order_value));
-			Ok(().into())
-		}
-
-        #[pallet::weight(50_000_000)]
-		pub fn remove_from_order(origin: OriginFor<T>, chain_id: AcuityChainId, adapter_id: AcuityAdapterId, asset_id: AcuityAssetId, price: u128, foreign_address: AcuityForeignAddress, value: BalanceOf<T>) -> DispatchResultWithPostInfo {
-            let sender = ensure_signed(origin)?;
-            // Calculate order_id.
-            let order_id = Self::get_order_id(sender.clone(), chain_id, adapter_id, asset_id, price, foreign_address);
-            // Check there is enough.
-            let order_value = <AcuityOrderIdValues<T>>::get(order_id);
-            frame_support::ensure!(value <= order_value, Error::<T>::OrderTooSmall);
-            // Move the value from the pallet to the sender.
-            T::Currency::transfer(&Self::fund_account_id(), &sender, value, AllowDeath)
-            				.map_err(|_| DispatchError::Other("Can't transfer value."))?;
-            // Remove value from order.
-            <AcuityOrderIdValues<T>>::insert(order_id, order_value - value);
-            Self::deposit_event(Event::RemoveFromOrder(sender, chain_id, adapter_id, asset_id, price, foreign_address, value));
-			Ok(().into())
-		}
-
-        #[pallet::weight(50_000_000)]
-        pub fn remove_from_order_all(origin: OriginFor<T>, chain_id: AcuityChainId, adapter_id: AcuityAdapterId, asset_id: AcuityAssetId, price: u128, foreign_address: AcuityForeignAddress) -> DispatchResultWithPostInfo {
-            let sender = ensure_signed(origin)?;
-            // Calculate order_id.
-            let order_id = Self::get_order_id(sender.clone(), chain_id, adapter_id, asset_id, price, foreign_address);
-            let value = <AcuityOrderIdValues<T>>::get(order_id);
-            // Move the value from the pallet to the sender.
-            T::Currency::transfer(&Self::fund_account_id(), &sender, value, AllowDeath)
-            				.map_err(|_| DispatchError::Other("Can't transfer value."))?;
-            // Remove value from order.
-            <AcuityOrderIdValues<T>>::remove(order_id);
-            Self::deposit_event(Event::RemoveFromOrder(sender, chain_id, adapter_id, asset_id, price, foreign_address, value));
-			Ok(().into())
-		}
-
-        #[pallet::weight(50_000_000)]
-		pub fn lock_sell(origin: OriginFor<T>, hashed_secret: AcuityHashedSecret, chain_id: AcuityChainId, adapter_id: AcuityAdapterId, asset_id: AcuityAssetId, price: u128, foreign_address: AcuityForeignAddress, buyer: T::AccountId, value: BalanceOf<T>, timeout: T::Moment) -> DispatchResultWithPostInfo {
-            let sender = ensure_signed(origin)?;
-            // Calculate order_id.
-            let order_id = Self::get_order_id(sender.clone(), chain_id, adapter_id, asset_id, price, foreign_address);
-            // Check there is enough.
-            let order_total = <AcuityOrderIdValues<T>>::get(order_id);
-            frame_support::ensure!(value <= order_total, Error::<T>::OrderTooSmall);
-            // Ensure hashed secret is not already in use.
-            ensure!(
-				!SellLocks::<T>::contains_key(order_id, hashed_secret),
-				Error::<T>::HashedSecretAlreadyInUse
-			);
-            // Move value into sell lock.
-            <AcuityOrderIdValues<T>>::insert(order_id, order_total - value);
-
-            let sell_lock: SellLock<T::AccountId, BalanceOf<T>, T::Moment> = SellLock {
-                order_id: order_id,
-                buyer: buyer,
-                value: value,
-                timeout: timeout,
-            };
-            SellLocks::<T>::insert(order_id, hashed_secret, sell_lock);
-            Self::deposit_event(Event::LockSell(order_id, hashed_secret, timeout, value));
-			Ok(().into())
-		}
-
-        #[pallet::weight(50_000_000)]
-		pub fn unlock_sell(origin: OriginFor<T>, order_id: AcuityOrderId, secret: AcuitySecret) -> DispatchResultWithPostInfo {
-            let _sender = ensure_signed(origin)?;
-			let now = <pallet_timestamp::Pallet<T>>::get();
-            // Calculate hashed secret.
-            let mut hashed_secret = AcuityHashedSecret::default();
-            hashed_secret.0.copy_from_slice(&keccak_256(&secret.encode()));
-            // Check sell lock has not timed out.
-            let lock = SellLocks::<T>::get(order_id, hashed_secret).ok_or(Error::<T>::LockNotFound)?;
-            frame_support::ensure!(lock.timeout > now, Error::<T>::LockTimedOut);
-            // Delete lock.
-            SellLocks::<T>::remove(order_id, hashed_secret);
-            // Send the funds.
-            T::Currency::transfer(&Self::fund_account_id(), &lock.buyer, lock.value, AllowDeath)
-            				.map_err(|_| DispatchError::Other("Can't transfer value."))?;
-            Self::deposit_event(Event::UnlockSell(order_id, secret, lock.buyer));
-			Ok(().into())
-		}
-
-        #[pallet::weight(50_000_000)]
-		pub fn timeout_sell(origin: OriginFor<T>, hashed_secret: AcuityHashedSecret, chain_id: AcuityChainId, adapter_id: AcuityAdapterId, asset_id: AcuityAssetId, price: u128, foreign_address: AcuityForeignAddress) -> DispatchResultWithPostInfo {
-            let sender = ensure_signed(origin)?;
-            let now = <pallet_timestamp::Pallet<T>>::get();
-            // Calculate order_id.
-            let order_id = Self::get_order_id(sender.clone(), chain_id, adapter_id, asset_id, price, foreign_address);
-            // Check order_id is correct and lock has timed out.
-            let lock = SellLocks::<T>::get(order_id, hashed_secret).ok_or(Error::<T>::LockNotFound)?;
-            frame_support::ensure!(lock.order_id == order_id, Error::<T>::WrongOrderId);
-            frame_support::ensure!(lock.timeout <= now, Error::<T>::LockNotTimedOut);
-            // Delete lock.
-            SellLocks::<T>::remove(order_id, hashed_secret);
-            // Return funds to sell order.
-            let order_total = <AcuityOrderIdValues<T>>::get(order_id);
-            <AcuityOrderIdValues<T>>::insert(order_id, order_total + lock.value);
-            Self::deposit_event(Event::TimeoutSell(order_id, hashed_secret));
-			Ok(().into())
-		}
-
-        #[pallet::weight(50_000_000)]
-		pub fn lock_buy(origin: OriginFor<T>, hashed_secret: AcuityHashedSecret, chain_id: AcuityChainId, adapter_id: AcuityAdapterId, order_id: AcuityOrderId, seller: T::AccountId, timeout: T::Moment, value: BalanceOf<T>, foreign_address: AcuityForeignAddress) -> DispatchResultWithPostInfo {
+		pub fn lock_buy(origin: OriginFor<T>, recipient: T::AccountId, hashed_secret: AcuityHashedSecret, timeout: T::Moment, value: BalanceOf<T>, sell_asset_id: AcuityAssetId, price: u128) -> DispatchResultWithPostInfo {
             let buyer = ensure_signed(origin)?;
-            // Ensure hashed secret is not already in use.
-            ensure!(
-				!BuyLocks::<T>::contains_key(&buyer, hashed_secret),
-				Error::<T>::HashedSecretAlreadyInUse
-			);
+            // Ensure value is nonzero.
+            frame_support::ensure!(!value.is_zero(), Error::<T>::ZeroValue);
+            // Calculate lock_id.
+            let lock_id = Self::get_lock_id(buyer.clone(), recipient, hashed_secret, timeout);
+            // Ensure lockId is not already in use.
+            ensure!(LockIdValue::<T>::get(lock_id).is_zero(), Error::<T>::LockAlreadyExists);
             // Move the value from the sender to the pallet.
             T::Currency::transfer(&buyer, &Self::fund_account_id(), value, AllowDeath)
             				.map_err(|_| DispatchError::Other("Can't transfer value."))?;
-            // Store lock data.
-            let lock: BuyLock<T::AccountId, BalanceOf<T>, T::Moment> = BuyLock {
-                seller: seller.clone(),
-                value: value,
-                timeout: timeout,
-            };
-            <BuyLocks<T>>::insert(&buyer, hashed_secret, lock);
-
-            Self::deposit_event(Event::LockBuy(buyer, seller, hashed_secret, timeout, value, chain_id, adapter_id, order_id, foreign_address));
+                            // Move value into buy lock.
+            <LockIdValue<T>>::insert(lock_id, value);
+            // Log info.
+//            Self::deposit_event(Event::LockBuy(buyer, seller, hashed_secret, timeout, value, chain_id, adapter_id, order_id, foreign_address));
 			Ok(().into())
 		}
 
         #[pallet::weight(50_000_000)]
-		pub fn unlock_buy(origin: OriginFor<T>, buyer: T::AccountId, secret: AcuitySecret) -> DispatchResultWithPostInfo {
-            let _sender = ensure_signed(origin)?;
-            let now = <pallet_timestamp::Pallet<T>>::get();
+		pub fn lock_sell(origin: OriginFor<T>, recipient: T::AccountId, hashed_secret: AcuityHashedSecret, timeout: T::Moment, stash_asset_id: AcuityAssetId, value: BalanceOf<T>, buy_lock_id: AcuityLockId) -> DispatchResultWithPostInfo {
+            let seller = ensure_signed(origin)?;
+            // Ensure value is nonzero.
+            frame_support::ensure!(!value.is_zero(), Error::<T>::ZeroValue);
+            // Check there is enough.
+            frame_support::ensure!(<StashValue<T>>::get(stash_asset_id, &seller) >= value, Error::<T>::StashNotBigEnough);
+            // Calculate lock_id.
+            let lock_id = Self::get_lock_id(seller.clone(), recipient, hashed_secret, timeout);
+            // Ensure lockId is not already in use.
+            ensure!(LockIdValue::<T>::get(lock_id).is_zero(), Error::<T>::LockAlreadyExists);
+            // Move value into sell lock.
+            Self::stash_remove(stash_asset_id, seller, value);
+            <LockIdValue<T>>::insert(lock_id, value);
+            // Log info.
+//            Self::deposit_event(Event::LockBuy(buyer, seller, hashed_secret, timeout, value, chain_id, adapter_id, order_id, foreign_address));
+			Ok(().into())
+		}
+
+        #[pallet::weight(50_000_000)]
+		pub fn decline_by_recipient(origin: OriginFor<T>, sender: T::AccountId, hashed_secret: AcuityHashedSecret, timeout: T::Moment) -> DispatchResultWithPostInfo {
+            let recipient = ensure_signed(origin)?;
+            // Calculate lock_id.
+            let lock_id = Self::get_lock_id(sender.clone(), recipient, hashed_secret, timeout);
+            // Get lock value.
+            let value = <LockIdValue<T>>::get(lock_id);
+            // Delete lock.
+            LockIdValue::<T>::remove(lock_id);
+            // Transfer the value back to the sender.
+            T::Currency::transfer(&Self::fund_account_id(), &sender, value, AllowDeath)
+            				.map_err(|_| DispatchError::Other("Can't transfer value."))?;
+            // Log info.
+//            emit DeclineByRecipient(sender, msg.sender, lockId);
+            Ok(().into())
+        }
+
+        #[pallet::weight(50_000_000)]
+		pub fn unlock_by_sender(origin: OriginFor<T>, recipient: T::AccountId, secret: AcuitySecret, timeout: T::Moment) -> DispatchResultWithPostInfo {
+            let sender = ensure_signed(origin)?;
             // Calculate hashed secret.
             let mut hashed_secret = AcuityHashedSecret::default();
             hashed_secret.0.copy_from_slice(&keccak_256(&secret.encode()));
+            // Calculate lock_id.
+            let lock_id = Self::get_lock_id(sender, recipient.clone(), hashed_secret, timeout);
             // Check lock has not timed out.
-            let lock = <BuyLocks<T>>::get(&buyer, hashed_secret).ok_or(Error::<T>::LockNotFound)?;
-            frame_support::ensure!(lock.timeout > now, Error::<T>::LockTimedOut);
+            frame_support::ensure!(timeout > <pallet_timestamp::Pallet<T>>::get(), Error::<T>::LockTimedOut);
+            // Get lock value.
+            let value = <LockIdValue<T>>::get(lock_id);
             // Delete lock.
-            <BuyLocks<T>>::remove(&buyer, hashed_secret);
-            // Send the funds.
-            T::Currency::transfer(&Self::fund_account_id(), &lock.seller, lock.value, AllowDeath)
+            LockIdValue::<T>::remove(lock_id);
+            // Transfer the value.
+            T::Currency::transfer(&Self::fund_account_id(), &recipient, value, AllowDeath)
             				.map_err(|_| DispatchError::Other("Can't transfer value."))?;
-            Self::deposit_event(Event::UnlockBuy(buyer, hashed_secret));
-			Ok(().into())
-		}
+            // Log info.
+//            emit UnlockBySender(msg.sender, recipient, lockId, secret);
+            Ok(().into())
+        }
 
         #[pallet::weight(50_000_000)]
-		pub fn timeout_buy(origin: OriginFor<T>, secret: AcuitySecret) -> DispatchResultWithPostInfo {
-            let buyer = ensure_signed(origin)?;
-            let now = <pallet_timestamp::Pallet<T>>::get();
+		pub fn unlock_by_recipient(origin: OriginFor<T>, sender: T::AccountId, secret: AcuitySecret, timeout: T::Moment) -> DispatchResultWithPostInfo {
+            let recipient = ensure_signed(origin)?;
             // Calculate hashed secret.
             let mut hashed_secret = AcuityHashedSecret::default();
             hashed_secret.0.copy_from_slice(&keccak_256(&secret.encode()));
-            // Check lock has timed out.
-            let lock = <BuyLocks<T>>::get(&buyer, hashed_secret).ok_or(Error::<T>::LockNotFound)?;
-            frame_support::ensure!(lock.timeout <= now, Error::<T>::LockNotTimedOut);
+            // Calculate lock_id.
+            let lock_id = Self::get_lock_id(sender, recipient.clone(), hashed_secret, timeout);
+            // Check lock has not timed out.
+            frame_support::ensure!(timeout > <pallet_timestamp::Pallet<T>>::get(), Error::<T>::LockTimedOut);
+            // Get lock value.
+            let value = <LockIdValue<T>>::get(lock_id);
             // Delete lock.
-            <BuyLocks<T>>::remove(&buyer, hashed_secret);
-            // Send the funds.
-            T::Currency::transfer(&Self::fund_account_id(), &buyer, lock.value, AllowDeath)
+            LockIdValue::<T>::remove(lock_id);
+            // Transfer the value.
+            T::Currency::transfer(&Self::fund_account_id(), &recipient, value, AllowDeath)
             				.map_err(|_| DispatchError::Other("Can't transfer value."))?;
-            Self::deposit_event(Event::TimeoutBuy(buyer, hashed_secret));
-			Ok(().into())
-		}
-        */
+            // Log info.
+//            emit UnlockBySender(msg.sender, recipient, lockId, secret);
+            Ok(().into())
+        }
+
+        #[pallet::weight(50_000_000)]
+		pub fn timeout_stash(origin: OriginFor<T>, recipient: T::AccountId, hashed_secret: AcuityHashedSecret, timeout: T::Moment, stash_asset_id: AcuityAssetId) -> DispatchResultWithPostInfo {
+            let sender = ensure_signed(origin)?;
+            // Calculate lock_id.
+            let lock_id = Self::get_lock_id(sender.clone(), recipient.clone(), hashed_secret, timeout);
+            // Check lock has timed out.
+            frame_support::ensure!(timeout <= <pallet_timestamp::Pallet<T>>::get(), Error::<T>::LockNotTimedOut);
+            // Get lock value.
+            let value = <LockIdValue<T>>::get(lock_id);
+            // Ensure value is nonzero.
+            frame_support::ensure!(!value.is_zero(), Error::<T>::ZeroValue);
+            // Delete lock.
+            LockIdValue::<T>::remove(lock_id);
+            // Return funds.
+            Self::stash_add(stash_asset_id, sender, value);
+            // Log info.
+//            emit Timeout(msg.sender, recipient, lockId);
+            Ok(().into())
+        }
+
+        #[pallet::weight(50_000_000)]
+		pub fn timeout_value(origin: OriginFor<T>, recipient: T::AccountId, hashed_secret: AcuityHashedSecret, timeout: T::Moment) -> DispatchResultWithPostInfo {
+            let sender = ensure_signed(origin)?;
+            // Calculate lock_id.
+            let lock_id = Self::get_lock_id(sender.clone(), recipient.clone(), hashed_secret, timeout);
+            // Check lock has timed out.
+            frame_support::ensure!(timeout <= <pallet_timestamp::Pallet<T>>::get(), Error::<T>::LockNotTimedOut);
+            // Get lock value.
+            let value = <LockIdValue<T>>::get(lock_id);
+            // Delete lock.
+            LockIdValue::<T>::remove(lock_id);
+            // Transfer the value.
+            T::Currency::transfer(&Self::fund_account_id(), &sender, value, AllowDeath)
+            				.map_err(|_| DispatchError::Other("Can't transfer value."))?;
+            // Log info.
+//            emit Timeout(msg.sender, recipient, lockId);
+            Ok(().into())
+        }
+
 	}
 	#[pallet::event]
 	#[pallet::generate_deposit(pub fn deposit_event)]
@@ -380,6 +319,10 @@ pub mod pallet {
 	pub enum Error<T> {
         /// Value must not be zero.
         ZeroValue,
+        /// The stash is not big enough.
+        StashNotBigEnough,
+        /// Value has already been locked with this lockId.
+        LockAlreadyExists,
         /// The order has too little value.
         OrderTooSmall,
         /// The order ID is incorrect.
@@ -390,8 +333,6 @@ pub mod pallet {
         LockTimedOut,
         /// The lock has not timed out.
         LockNotTimedOut,
-        /// The hashed secret is already in use.
-        HashedSecretAlreadyInUse,
 	}
 
     #[pallet::storage]
@@ -412,7 +353,7 @@ pub mod pallet {
 
     #[pallet::storage]
     #[pallet::getter(fn lock_id_value)]
-    pub(super) type AcuityLockIdValue<T: Config> = StorageMap<_,
+    pub(super) type LockIdValue<T: Config> = StorageMap<_,
         Blake2_128Concat, AcuityLockId,
         BalanceOf<T>, ValueQuery
     >;
@@ -426,6 +367,12 @@ impl<T: Config> Pallet<T> {
 	pub fn fund_account_id() -> T::AccountId {
 		T::PalletId::get().into_account_truncating()
 	}
+
+    pub fn get_lock_id(sender: T::AccountId, recipient: T::AccountId, hashed_secret: AcuityHashedSecret, timeout: T::Moment) -> AcuityLockId {
+        let mut lock_id = AcuityLockId::default();
+		lock_id.0.copy_from_slice(&blake2_128(&[sender.encode(), recipient.encode(), hashed_secret.encode(), timeout.encode()].concat()));
+        lock_id
+    }
 
     pub fn stash_add(asset_id: AcuityAssetId, account: T::AccountId, value: BalanceOf<T>) {
         let zero_account_id = T::AccountId::decode(&mut TrailingZeroInput::zeroes()).unwrap();
