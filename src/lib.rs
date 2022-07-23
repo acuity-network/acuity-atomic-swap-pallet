@@ -11,8 +11,6 @@ use frame_support::{
 use scale_info::TypeInfo;
 use sp_io::hashing::{blake2_128, keccak_256};
 
-use std::default::Default;
-
 pub use pallet::*;
 
 use sp_std::{
