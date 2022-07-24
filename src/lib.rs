@@ -319,12 +319,6 @@ pub mod pallet {
         StashNotBigEnough,
         /// Value has already been locked with this lockId.
         LockAlreadyExists,
-        /// The order has too little value.
-        OrderTooSmall,
-        /// The order ID is incorrect.
-        WrongOrderId,
-        /// The lock has timed out.
-        LockNotFound,
         /// The lock has timed out.
         LockTimedOut,
         /// The lock has not timed out.
