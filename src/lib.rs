@@ -455,5 +455,9 @@ pub mod pallet {
             // Log info.
             Self::deposit_event(Event::StashRemove(account, asset_id, value));
     	}
+
+        pub fn get_stashes(asset_id: AcuityAssetId, offset: u32, limit: u32) -> sp_std::prelude::Vec<(T::AccountId, BalanceOf<T>)> {
+            sp_std::prelude::Vec::new()
+        }
     }
 }
