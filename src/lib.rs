@@ -65,20 +65,6 @@ pub mod pallet {
 	use frame_system::pallet_prelude::*;
 	use super::*;
 
-    #[derive(Encode, Decode, Default, Clone, PartialEq, TypeInfo, MaxEncodedLen, Debug)]
-    pub struct SellLock<AccountId, Balance, Moment> {
-        pub buyer: AccountId,
-        pub value: Balance,
-        pub timeout: Moment,
-    }
-
-    #[derive(Encode, Decode, Default, Clone, PartialEq, TypeInfo, MaxEncodedLen, Debug)]
-    pub struct BuyLock<AccountId, Balance, Moment> {
-        pub seller: AccountId,
-        pub value: Balance,
-        pub timeout: Moment,
-    }
-
 	#[pallet::pallet]
 	#[pallet::generate_store(trait Store)]
 	pub struct Pallet<T>(PhantomData<T>);
