@@ -4,8 +4,7 @@ use sp_std::prelude::*;
 use sp_runtime::{traits::AccountIdConversion, RuntimeDebug};
 use frame_support::{
     pallet_prelude::MaxEncodedLen,
-    traits::{ExistenceRequirement::AllowDeath},
-	traits::{Currency, Get},
+    traits::{ExistenceRequirement::AllowDeath, Currency},
     PalletId,
 };
 use scale_info::TypeInfo;
@@ -274,8 +273,8 @@ pub mod pallet {
             Self::deposit_event(Event::Timeout(sender, recipient, lock_id));
             Ok(().into())
         }
-
 	}
+
 	#[pallet::event]
 	#[pallet::generate_deposit(pub fn deposit_event)]
 	pub enum Event<T: Config> {
@@ -333,98 +332,28 @@ pub mod pallet {
         Blake2_128Concat, AcuityLockId,
         BalanceOf<T>, ValueQuery
     >;
-}
 
-impl<T: Config> Pallet<T> {
-	/// The account ID of the fund pot.
-	///
-	/// This actually does computation. If you need to keep using it, then make sure you cache the
-	/// value and only call this once.
-	pub fn fund_account_id() -> T::AccountId {
-		T::PalletId::get().into_account_truncating()
-	}
+    impl<T: Config> Pallet<T> {
+    	/// The account ID of the fund pot.
+    	///
+    	/// This actually does computation. If you need to keep using it, then make sure you cache the
+    	/// value and only call this once.
+    	pub fn fund_account_id() -> T::AccountId {
+    		T::PalletId::get().into_account_truncating()
+    	}
 
-    pub fn get_lock_id(sender: T::AccountId, recipient: T::AccountId, hashed_secret: AcuityHashedSecret, timeout: T::Moment) -> AcuityLockId {
-        let mut lock_id = AcuityLockId::default();
-		lock_id.0.copy_from_slice(&blake2_128(&[sender.encode(), recipient.encode(), hashed_secret.encode(), timeout.encode()].concat()));
-        lock_id
-    }
-
-    pub fn stash_add(asset_id: AcuityAssetId, account: T::AccountId, value: BalanceOf<T>) {
-        let zero_account_id = T::AccountId::decode(&mut TrailingZeroInput::zeroes()).unwrap();
-        // Get new total.
-        let total = <StashValue<T>>::get(asset_id, &account) + value;
-        // Search for new previous.
-        let mut prev = zero_account_id.clone();
-        loop {
-            let next = match <StashLL<T>>::get(asset_id, &prev) {
-                Some(p) => p,
-                None => break,
-            };
-            let value = <StashValue<T>>::get(asset_id, &next);
-            if value < total {
-                break;
-            }
-            prev = next;
-        }
-        let mut replace = false;
-        // Is sender already in the list?
-        if !<StashValue<T>>::get(asset_id, &account).is_zero() {
-            // Search for old previous.
-            let mut old_prev = zero_account_id;
-            loop {
-                let next = match <StashLL<T>>::get(asset_id, &old_prev) {
-                    Some(p) => p,
-                    None => break,
-                };
-                if next == account {
-                    break;
-                }
-                old_prev = next;
-            }
-            // Is it in the same position?
-            if prev == old_prev {
-                replace = true;
-            }
-            else {
-                // Remove sender from current position.
-                let next = <StashLL<T>>::get(asset_id, &account).unwrap();
-                <StashLL<T>>::insert(asset_id, old_prev, next);
-            }
-            if !replace {
-                // Insert into linked list.
-                let next = <StashLL<T>>::get(asset_id, &prev).unwrap();
-                <StashLL<T>>::insert(asset_id, &account, next);
-                <StashLL<T>>::insert(asset_id, &prev, &account);
-            }
-            // Update the value deposited.
-            <StashValue<T>>::insert(asset_id, &account, total);
-            // Log info.
-            Self::deposit_event(Event::StashAdd(account, asset_id, value));
+        pub fn get_lock_id(sender: T::AccountId, recipient: T::AccountId, hashed_secret: AcuityHashedSecret, timeout: T::Moment) -> AcuityLockId {
+            let mut lock_id = AcuityLockId::default();
+    		lock_id.0.copy_from_slice(&blake2_128(&[sender.encode(), recipient.encode(), hashed_secret.encode(), timeout.encode()].concat()));
+            lock_id
         }
 
-	}
-
-    pub fn stash_remove(asset_id: AcuityAssetId, account: T::AccountId, value: BalanceOf<T>) {
-        let zero_account_id = T::AccountId::decode(&mut TrailingZeroInput::zeroes()).unwrap();
-        // Get new total.
-        let total = <StashValue<T>>::get(asset_id, &account) - value;
-        // Search for old previous.
-        let mut old_prev = zero_account_id.clone();
-        loop {
-            let next = match <StashLL<T>>::get(asset_id, &old_prev) {
-                Some(p) => p,
-                None => break,
-            };
-            if next == account {
-                break;
-            }
-            old_prev = next;
-        }
-        // Is there still a stash?
-        if !total.is_zero() {
+        pub fn stash_add(asset_id: AcuityAssetId, account: T::AccountId, value: BalanceOf<T>) {
+            let zero_account_id = T::AccountId::decode(&mut TrailingZeroInput::zeroes()).unwrap();
+            // Get new total.
+            let total = <StashValue<T>>::get(asset_id, &account) + value;
             // Search for new previous.
-            let mut prev = zero_account_id;
+            let mut prev = zero_account_id.clone();
             loop {
                 let next = match <StashLL<T>>::get(asset_id, &prev) {
                     Some(p) => p,
@@ -436,25 +365,95 @@ impl<T: Config> Pallet<T> {
                 }
                 prev = next;
             }
-            // Is it in a new position?
-            if prev != account {
-                // Remove sender from old position.
+            let mut replace = false;
+            // Is sender already in the list?
+            if !<StashValue<T>>::get(asset_id, &account).is_zero() {
+                // Search for old previous.
+                let mut old_prev = zero_account_id;
+                loop {
+                    let next = match <StashLL<T>>::get(asset_id, &old_prev) {
+                        Some(p) => p,
+                        None => break,
+                    };
+                    if next == account {
+                        break;
+                    }
+                    old_prev = next;
+                }
+                // Is it in the same position?
+                if prev == old_prev {
+                    replace = true;
+                }
+                else {
+                    // Remove sender from current position.
+                    let next = <StashLL<T>>::get(asset_id, &account).unwrap();
+                    <StashLL<T>>::insert(asset_id, old_prev, next);
+                }
+                if !replace {
+                    // Insert into linked list.
+                    let next = <StashLL<T>>::get(asset_id, &prev).unwrap();
+                    <StashLL<T>>::insert(asset_id, &account, next);
+                    <StashLL<T>>::insert(asset_id, &prev, &account);
+                }
+                // Update the value deposited.
+                <StashValue<T>>::insert(asset_id, &account, total);
+                // Log info.
+                Self::deposit_event(Event::StashAdd(account, asset_id, value));
+            }
+
+    	}
+
+        pub fn stash_remove(asset_id: AcuityAssetId, account: T::AccountId, value: BalanceOf<T>) {
+            let zero_account_id = T::AccountId::decode(&mut TrailingZeroInput::zeroes()).unwrap();
+            // Get new total.
+            let total = <StashValue<T>>::get(asset_id, &account) - value;
+            // Search for old previous.
+            let mut old_prev = zero_account_id.clone();
+            loop {
+                let next = match <StashLL<T>>::get(asset_id, &old_prev) {
+                    Some(p) => p,
+                    None => break,
+                };
+                if next == account {
+                    break;
+                }
+                old_prev = next;
+            }
+            // Is there still a stash?
+            if !total.is_zero() {
+                // Search for new previous.
+                let mut prev = zero_account_id;
+                loop {
+                    let next = match <StashLL<T>>::get(asset_id, &prev) {
+                        Some(p) => p,
+                        None => break,
+                    };
+                    let value = <StashValue<T>>::get(asset_id, &next);
+                    if value < total {
+                        break;
+                    }
+                    prev = next;
+                }
+                // Is it in a new position?
+                if prev != account {
+                    // Remove sender from old position.
+                    let next = <StashLL<T>>::get(asset_id, &account).unwrap();
+                    <StashLL<T>>::insert(asset_id, old_prev, next);
+                    // Insert into new position.
+                    let next = <StashLL<T>>::get(asset_id, &prev).unwrap();
+                    <StashLL<T>>::insert(asset_id, &account, next);
+                    <StashLL<T>>::insert(asset_id, &prev, &account);
+                }
+            }
+            else {
+                // Remove sender from current position.
                 let next = <StashLL<T>>::get(asset_id, &account).unwrap();
                 <StashLL<T>>::insert(asset_id, old_prev, next);
-                // Insert into new position.
-                let next = <StashLL<T>>::get(asset_id, &prev).unwrap();
-                <StashLL<T>>::insert(asset_id, &account, next);
-                <StashLL<T>>::insert(asset_id, &prev, &account);
             }
-        }
-        else {
-            // Remove sender from current position.
-            let next = <StashLL<T>>::get(asset_id, &account).unwrap();
-            <StashLL<T>>::insert(asset_id, old_prev, next);
-        }
-        // Update the value deposited.
-        <StashValue<T>>::insert(asset_id, &account, total);
-        // Log info.
-        Self::deposit_event(Event::StashRemove(account, asset_id, value));
-	}
+            // Update the value deposited.
+            <StashValue<T>>::insert(asset_id, &account, total);
+            // Log info.
+            Self::deposit_event(Event::StashRemove(account, asset_id, value));
+    	}
+    }
 }
