@@ -508,8 +508,33 @@ pub mod pallet {
             <AccountNextIndex<T>>::insert(account, i + 1);
         }
 
-        pub fn get_stashes(asset_id: AcuityAssetId, offset: u32, limit: u32) -> sp_std::prelude::Vec<(T::AccountId, BalanceOf<T>)> {
-            sp_std::prelude::Vec::new()
+        pub fn get_stashes(asset_id: AcuityAssetId, mut offset: u32, mut limit: u32) -> sp_std::prelude::Vec<(T::AccountId, BalanceOf<T>)> {
+            let zero_account_id = T::AccountId::decode(&mut TrailingZeroInput::zeroes()).unwrap();
+            // Find first account after offset.
+            let mut account = zero_account_id.clone();
+            loop {
+                if offset == 0 {
+                    break;
+                }
+                account = match <StashLL<T>>::get(asset_id, &account) {
+                    Some(p) => p,
+                    None => return sp_std::prelude::Vec::new(),
+                };
+                offset = offset - 1;
+            }
+            let mut stashes = sp_std::prelude::Vec::new();
+            loop {
+                if limit == 0 {
+                    break;
+                }
+                stashes.push((account.clone(), <StashValue<T>>::get(asset_id, &account)));
+                account = match <StashLL<T>>::get(asset_id, &account) {
+                    Some(p) => p,
+                    None => break,
+                };
+                limit = limit - 1;
+            }
+            stashes
         }
     }
 }
