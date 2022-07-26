@@ -150,6 +150,9 @@ pub mod pallet {
             				.map_err(|_| DispatchError::Other("Can't transfer value."))?;
                             // Move value into buy lock.
             <LockIdValue<T>>::insert(lock_id, value);
+            // Index event.
+            Self::index_account(buyer.clone());
+            Self::index_account(recipient.clone());
             // Log info.
             Self::deposit_event(Event::BuyLock(buyer, recipient, hashed_secret, timeout, value, lock_id, sell_asset_id, sell_price));
 			Ok(().into())
@@ -169,6 +172,9 @@ pub mod pallet {
             // Move value into sell lock.
             Self::stash_remove(stash_asset_id, seller.clone(), value);
             <LockIdValue<T>>::insert(lock_id, value);
+            // Index event.
+            Self::index_account(seller.clone());
+            Self::index_account(recipient.clone());
             // Log info.
             Self::deposit_event(Event::SellLock(seller, recipient, hashed_secret, timeout, value, lock_id, stash_asset_id, buy_lock_id));
 			Ok(().into())
@@ -186,6 +192,9 @@ pub mod pallet {
             // Transfer the value back to the sender.
             T::Currency::transfer(&Self::fund_account_id(), &sender, value, AllowDeath)
             				.map_err(|_| DispatchError::Other("Can't transfer value."))?;
+            // Index event.
+            Self::index_account(sender.clone());
+            Self::index_account(recipient.clone());
             // Log info.
             Self::deposit_event(Event::DeclineByRecipient(sender, recipient, lock_id));
             Ok(().into())
@@ -208,6 +217,9 @@ pub mod pallet {
             // Transfer the value.
             T::Currency::transfer(&Self::fund_account_id(), &recipient, value, AllowDeath)
             				.map_err(|_| DispatchError::Other("Can't transfer value."))?;
+            // Index event.
+            Self::index_account(sender.clone());
+            Self::index_account(recipient.clone());
             // Log info.
             Self::deposit_event(Event::UnlockBySender(sender, recipient, lock_id, secret));
             Ok(().into())
@@ -230,6 +242,9 @@ pub mod pallet {
             // Transfer the value.
             T::Currency::transfer(&Self::fund_account_id(), &recipient, value, AllowDeath)
             				.map_err(|_| DispatchError::Other("Can't transfer value."))?;
+            // Index event.
+            Self::index_account(sender.clone());
+            Self::index_account(recipient.clone());
             // Log info.
             Self::deposit_event(Event::UnlockByRecipient(sender, recipient, lock_id, secret));
             Ok(().into())
@@ -250,6 +265,9 @@ pub mod pallet {
             LockIdValue::<T>::remove(lock_id);
             // Return funds.
             Self::stash_add(stash_asset_id, sender.clone(), value);
+            // Index event.
+            Self::index_account(sender.clone());
+            Self::index_account(recipient.clone());
             // Log info.
             Self::deposit_event(Event::Timeout(sender, recipient, lock_id));
             Ok(().into())
@@ -269,6 +287,9 @@ pub mod pallet {
             // Transfer the value.
             T::Currency::transfer(&Self::fund_account_id(), &sender, value, AllowDeath)
             				.map_err(|_| DispatchError::Other("Can't transfer value."))?;
+            // Index event.
+            Self::index_account(sender.clone());
+            Self::index_account(recipient.clone());
             // Log info.
             Self::deposit_event(Event::Timeout(sender, recipient, lock_id));
             Ok(().into())
@@ -352,7 +373,7 @@ pub mod pallet {
     pub(super) type AccountIndexHeight<T: Config> = StorageDoubleMap<_,
         Blake2_128Concat, T::AccountId,
         Blake2_128Concat, u64,
-        u64
+        <T as frame_system::Config>::BlockNumber
     >;
 
     impl<T: Config> Pallet<T> {
@@ -477,6 +498,15 @@ pub mod pallet {
             // Log info.
             Self::deposit_event(Event::StashRemove(account, asset_id, value));
     	}
+
+        pub fn index_account(account: T::AccountId) {
+            // Get next index.
+            let i = <AccountNextIndex<T>>::get(&account);
+            // Insert current block number.
+            <AccountIndexHeight<T>>::insert(&account, i, <frame_system::Pallet<T>>::block_number());
+            // Update the next index.
+            <AccountNextIndex<T>>::insert(account, i + 1);
+        }
 
         pub fn get_stashes(asset_id: AcuityAssetId, offset: u32, limit: u32) -> sp_std::prelude::Vec<(T::AccountId, BalanceOf<T>)> {
             sp_std::prelude::Vec::new()
