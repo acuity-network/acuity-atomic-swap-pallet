@@ -82,6 +82,89 @@ fn deposit_stash() {
 	});
 }
 
+#[test]
+fn withdraw_stash() {
+	new_test_ext().execute_with(|| {
+		let mut asset_id = AcuityAssetId::default();
+		asset_id.0.copy_from_slice(&[1; 16]);
+		let stashes = AcuityAtomicSwap::get_stashes(asset_id, 0, 100);
+		assert_eq!(stashes.len(), 0);
+
+		assert_ok!(AcuityAtomicSwap::deposit_stash(Origin::signed(A), asset_id, 50));
+		let stashes = AcuityAtomicSwap::get_stashes(asset_id, 0, 100);
+		assert_eq!(stashes.len(), 1);
+		assert_eq!(stashes[0], (A, 50));
+
+		assert_ok!(AcuityAtomicSwap::withdraw_stash(Origin::signed(A), asset_id, 2));
+		let stashes = AcuityAtomicSwap::get_stashes(asset_id, 0, 100);
+		assert_eq!(stashes.len(), 1);
+		assert_eq!(stashes[0], (A, 48));
+
+		assert_ok!(AcuityAtomicSwap::deposit_stash(Origin::signed(B), asset_id, 40));
+		let stashes = AcuityAtomicSwap::get_stashes(asset_id, 0, 100);
+		assert_eq!(stashes.len(), 2);
+		assert_eq!(stashes[0], (A, 48));
+		assert_eq!(stashes[1], (B, 40));
+
+		assert_ok!(AcuityAtomicSwap::deposit_stash(Origin::signed(C), asset_id, 60));
+		let stashes = AcuityAtomicSwap::get_stashes(asset_id, 0, 100);
+		assert_eq!(stashes.len(), 3);
+		assert_eq!(stashes[0], (C, 60));
+		assert_eq!(stashes[1], (A, 48));
+		assert_eq!(stashes[2], (B, 40));
+
+		assert_ok!(AcuityAtomicSwap::deposit_stash(Origin::signed(D), asset_id, 45));
+		let stashes = AcuityAtomicSwap::get_stashes(asset_id, 0, 100);
+		assert_eq!(stashes.len(), 4);
+		assert_eq!(stashes[0], (C, 60));
+		assert_eq!(stashes[1], (A, 48));
+		assert_eq!(stashes[2], (D, 45));
+		assert_eq!(stashes[3], (B, 40));
+
+		assert_ok!(AcuityAtomicSwap::withdraw_stash(Origin::signed(C), asset_id, 40));
+		let stashes = AcuityAtomicSwap::get_stashes(asset_id, 0, 100);
+		assert_eq!(stashes.len(), 4);
+		assert_eq!(stashes[0], (A, 48));
+		assert_eq!(stashes[1], (D, 45));
+		assert_eq!(stashes[2], (B, 40));
+		assert_eq!(stashes[3], (C, 20));
+
+		assert_ok!(AcuityAtomicSwap::withdraw_stash(Origin::signed(A), asset_id, 3));
+		let stashes = AcuityAtomicSwap::get_stashes(asset_id, 0, 100);
+		assert_eq!(stashes.len(), 4);
+		assert_eq!(stashes[0], (D, 45));
+		assert_eq!(stashes[1], (A, 45));
+		assert_eq!(stashes[2], (B, 40));
+		assert_eq!(stashes[3], (C, 20));
+
+		assert_ok!(AcuityAtomicSwap::withdraw_stash(Origin::signed(C), asset_id, 20));
+		let stashes = AcuityAtomicSwap::get_stashes(asset_id, 0, 100);
+		assert_eq!(stashes.len(), 3);
+		assert_eq!(stashes[0], (D, 45));
+		assert_eq!(stashes[1], (A, 45));
+		assert_eq!(stashes[2], (B, 40));
+
+		assert_ok!(AcuityAtomicSwap::withdraw_stash(Origin::signed(D), asset_id, 45));
+		let stashes = AcuityAtomicSwap::get_stashes(asset_id, 0, 100);
+		assert_eq!(stashes.len(), 2);
+		assert_eq!(stashes[0], (A, 45));
+		assert_eq!(stashes[1], (B, 40));
+
+		assert_ok!(AcuityAtomicSwap::withdraw_stash(Origin::signed(A), asset_id, 45));
+		let stashes = AcuityAtomicSwap::get_stashes(asset_id, 0, 100);
+		assert_eq!(stashes.len(), 1);
+		assert_eq!(stashes[0], (B, 40));
+
+		assert_ok!(AcuityAtomicSwap::withdraw_stash(Origin::signed(B), asset_id, 40));
+		let stashes = AcuityAtomicSwap::get_stashes(asset_id, 0, 100);
+		assert_eq!(stashes.len(), 0);
+	});
+}
+
+
+
+
+
 /*
 #[test]
 fn lock_sell_control_too_small() {

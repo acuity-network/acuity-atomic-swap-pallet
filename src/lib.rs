@@ -490,7 +490,7 @@ pub mod pallet {
                     // Insert into new position.
                     match <StashLL<T>>::get(asset_id, &prev) {
                         Some(next) => <StashLL<T>>::insert(asset_id, &account, next),
-                        None => {},
+                        None => <StashLL<T>>::remove(asset_id, &account),
                     };
                     <StashLL<T>>::insert(asset_id, &prev, &account);
                 }
