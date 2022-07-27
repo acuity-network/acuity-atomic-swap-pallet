@@ -494,6 +494,8 @@ pub mod pallet {
                     };
                     <StashLL<T>>::insert(asset_id, &prev, &account);
                 }
+                // Update the value deposited.
+                <StashValue<T>>::insert(asset_id, &account, total);
             }
             else {
                 // Remove sender from current position.
@@ -501,9 +503,9 @@ pub mod pallet {
                     Some(next) => <StashLL<T>>::insert(asset_id, old_prev, next),
                     None => <StashLL<T>>::remove(asset_id, old_prev),
                 };
+                // Remove the stash value.
+                <StashValue<T>>::remove(asset_id, &account);
             }
-            // Update the value deposited.
-            <StashValue<T>>::insert(asset_id, &account, total);
             // Log info.
             Self::deposit_event(Event::StashRemove(account, asset_id, value));
     	}
