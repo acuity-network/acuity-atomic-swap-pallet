@@ -17,9 +17,11 @@ pub use pallet_acuity_atomic_swap_rpc_runtime_api::AtomicSwapApi as AtomicSwapRu
 use pallet_acuity_atomic_swap_rpc_runtime_api::AcuityAssetId;
 
 #[rpc(client, server)]
-pub trait AtomicSwapApi<AcuityAssetId, AccountId, BalanceOf, BlockHash> {
+pub trait AtomicSwapApi<AcuityAssetId, AccountId, BalanceOf, BlockNumber, BlockHash> {
 	#[method(name = "atomicSwap_getStashes")]
 	fn get_stashes(&self, asset_id: AcuityAssetId, offset: u32, limit: u32, at: Option<BlockHash>) -> RpcResult<Vec<(AccountId, BalanceOf)>>;
+	#[method(name = "atomicSwap_getIndexBlocks")]
+	fn get_index_blocks(&self, account: AccountId, at: Option<BlockHash>) -> RpcResult<Vec<BlockNumber>>;
 }
 
 pub struct AtomicSwap<C, P> {
@@ -51,17 +53,18 @@ impl From<Error> for i32 {
 }
 
 #[async_trait]
-impl<C, AccountId, Block, Balance>
-	AtomicSwapApiServer<AcuityAssetId, AccountId, Balance, <Block as BlockT>::Hash>
+impl<C, AccountId, Block, Balance, BlockNumber>
+	AtomicSwapApiServer<AcuityAssetId, AccountId, Balance, BlockNumber, <Block as BlockT>::Hash>
 	for AtomicSwap<C, Block>
 where
     AccountId: Codec,
     Block: BlockT,
 	Balance: Codec + Copy + Send + Sync + 'static,
+	BlockNumber: Codec + Copy + Send + Sync + 'static,
     C: Send + Sync + 'static,
     C: ProvideRuntimeApi<Block>,
     C: HeaderBackend<Block>,
-    C::Api: AtomicSwapRuntimeApi<Block, AcuityAssetId, AccountId, Balance>,
+    C::Api: AtomicSwapRuntimeApi<Block, AcuityAssetId, AccountId, Balance, BlockNumber>,
 {
     fn get_stashes(
         &self,
@@ -77,6 +80,27 @@ where
         ));
 
 		api.get_stashes(&at, asset_id, offset, limit).map_err(|e| {
+			CallError::Custom(ErrorObject::owned(
+				Error::RuntimeError.into(),
+				"Unable to query dispatch info.",
+				Some(e.to_string()),
+			))
+			.into()
+		})
+	}
+
+	fn get_index_blocks(
+        &self,
+		account: AccountId,
+        at: Option<<Block as BlockT>::Hash>,
+    ) -> RpcResult<Vec<BlockNumber>> {
+    	let api = self.client.runtime_api();
+        let at = BlockId::hash(at.unwrap_or_else(||
+            // If the block hash is not supplied assume the best block.
+            self.client.info().best_hash
+        ));
+
+		api.get_index_blocks(&at, account).map_err(|e| {
 			CallError::Custom(ErrorObject::owned(
 				Error::RuntimeError.into(),
 				"Unable to query dispatch info.",

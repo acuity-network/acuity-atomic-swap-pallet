@@ -508,6 +508,19 @@ pub mod pallet {
             <AccountNextIndex<T>>::insert(account, i + 1);
         }
 
+        pub fn get_index_blocks(account: T::AccountId) -> sp_std::prelude::Vec<<T as frame_system::Config>::BlockNumber> {
+            let mut blocks = sp_std::prelude::Vec::new();
+            let mut i = 0;
+            loop {
+                blocks.push(match <AccountIndexHeight<T>>::get(&account, i) {
+                    Some(height) => height,
+                    None => break,
+                });
+                i += 1;
+            }
+            blocks
+        }
+
         pub fn get_stashes(asset_id: AcuityAssetId, mut offset: u32, mut limit: u32) -> sp_std::prelude::Vec<(T::AccountId, BalanceOf<T>)> {
             let zero_account_id = T::AccountId::decode(&mut TrailingZeroInput::zeroes()).unwrap();
             // Find first account after offset.
