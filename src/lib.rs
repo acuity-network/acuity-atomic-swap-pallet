@@ -143,8 +143,8 @@ pub mod pallet {
             frame_support::ensure!(!value.is_zero(), Error::<T>::ZeroValue);
             // Calculate lock_id.
             let lock_id = Self::get_lock_id(buyer.clone(), recipient.clone(), hashed_secret, timeout);
-            // Ensure lockId is not already in use.
-            ensure!(LockIdValue::<T>::get(lock_id).is_zero(), Error::<T>::LockAlreadyExists);
+            // Ensure lock_id is not already in use.
+            ensure!(!LockIdValue::<T>::contains_key(lock_id), Error::<T>::LockAlreadyExists);
             // Move the value from the sender to the pallet.
             T::Currency::transfer(&buyer, &Self::fund_account_id(), value, AllowDeath)
             				.map_err(|_| DispatchError::Other("Can't transfer value."))?;
@@ -167,8 +167,8 @@ pub mod pallet {
             frame_support::ensure!(<StashValue<T>>::get(stash_asset_id, &seller) >= value, Error::<T>::StashNotBigEnough);
             // Calculate lock_id.
             let lock_id = Self::get_lock_id(seller.clone(), recipient.clone(), hashed_secret, timeout);
-            // Ensure lockId is not already in use.
-            ensure!(LockIdValue::<T>::get(lock_id).is_zero(), Error::<T>::LockAlreadyExists);
+            // Ensure lock_id is not already in use.
+            ensure!(!LockIdValue::<T>::contains_key(lock_id), Error::<T>::LockAlreadyExists);
             // Move value into sell lock.
             Self::stash_remove(stash_asset_id, seller.clone(), value);
             <LockIdValue<T>>::insert(lock_id, value);
@@ -186,7 +186,10 @@ pub mod pallet {
             // Calculate lock_id.
             let lock_id = Self::get_lock_id(sender.clone(), recipient.clone(), hashed_secret, timeout);
             // Get lock value.
-            let value = <LockIdValue<T>>::get(lock_id);
+            let value = match <LockIdValue<T>>::get(lock_id) {
+                Some(value) => value,
+                None => return Err(Error::<T>::LockDoesNotExist.into()),
+            };
             // Delete lock.
             LockIdValue::<T>::remove(lock_id);
             // Transfer the value back to the sender.
@@ -211,7 +214,10 @@ pub mod pallet {
             // Check lock has not timed out.
             frame_support::ensure!(timeout > <pallet_timestamp::Pallet<T>>::get(), Error::<T>::LockTimedOut);
             // Get lock value.
-            let value = <LockIdValue<T>>::get(lock_id);
+            let value = match <LockIdValue<T>>::get(lock_id) {
+                Some(value) => value,
+                None => return Err(Error::<T>::LockDoesNotExist.into()),
+            };
             // Delete lock.
             LockIdValue::<T>::remove(lock_id);
             // Transfer the value.
@@ -236,7 +242,10 @@ pub mod pallet {
             // Check lock has not timed out.
             frame_support::ensure!(timeout > <pallet_timestamp::Pallet<T>>::get(), Error::<T>::LockTimedOut);
             // Get lock value.
-            let value = <LockIdValue<T>>::get(lock_id);
+            let value = match <LockIdValue<T>>::get(lock_id) {
+                Some(value) => value,
+                None => return Err(Error::<T>::LockDoesNotExist.into()),
+            };
             // Delete lock.
             LockIdValue::<T>::remove(lock_id);
             // Transfer the value.
@@ -258,9 +267,10 @@ pub mod pallet {
             // Check lock has timed out.
             frame_support::ensure!(timeout <= <pallet_timestamp::Pallet<T>>::get(), Error::<T>::LockNotTimedOut);
             // Get lock value.
-            let value = <LockIdValue<T>>::get(lock_id);
-            // Ensure value is nonzero.
-            frame_support::ensure!(!value.is_zero(), Error::<T>::ZeroValue);
+            let value = match <LockIdValue<T>>::get(lock_id) {
+                Some(value) => value,
+                None => return Err(Error::<T>::LockDoesNotExist.into()),
+            };
             // Delete lock.
             LockIdValue::<T>::remove(lock_id);
             // Return funds.
@@ -281,7 +291,10 @@ pub mod pallet {
             // Check lock has timed out.
             frame_support::ensure!(timeout <= <pallet_timestamp::Pallet<T>>::get(), Error::<T>::LockNotTimedOut);
             // Get lock value.
-            let value = <LockIdValue<T>>::get(lock_id);
+            let value = match <LockIdValue<T>>::get(lock_id) {
+                Some(value) => value,
+                None => return Err(Error::<T>::LockDoesNotExist.into()),
+            };
             // Delete lock.
             LockIdValue::<T>::remove(lock_id);
             // Transfer the value.
@@ -325,6 +338,8 @@ pub mod pallet {
         StashNotBigEnough,
         /// Value has already been locked with this lockId.
         LockAlreadyExists,
+        /// No value has already been locked with this lockId.
+        LockDoesNotExist,
         /// The lock has timed out.
         LockTimedOut,
         /// The lock has not timed out.
@@ -351,7 +366,7 @@ pub mod pallet {
     #[pallet::getter(fn lock_id_value)]
     pub(super) type LockIdValue<T: Config> = StorageMap<_,
         Blake2_128Concat, AcuityLockId,
-        BalanceOf<T>, ValueQuery
+        BalanceOf<T>
     >;
 
     #[pallet::storage]
