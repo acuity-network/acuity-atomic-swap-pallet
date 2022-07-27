@@ -107,6 +107,29 @@ fn deposit_stash() {
 }
 
 #[test]
+fn withdraw_stash_control_not_big_enough() {
+	new_test_ext().execute_with(|| {
+		let mut asset_id = AcuityAssetId::default();
+		asset_id.0.copy_from_slice(&[1; 16]);
+		assert_ok!(AcuityAtomicSwap::deposit_stash(Origin::signed(A), asset_id, 50));
+		assert_ok!(AcuityAtomicSwap::withdraw_stash(Origin::signed(A), asset_id, 50));
+	});
+}
+
+#[test]
+fn withdraw_stash_fail_not_big_enough() {
+	new_test_ext().execute_with(|| {
+		let mut asset_id = AcuityAssetId::default();
+		asset_id.0.copy_from_slice(&[1; 16]);
+		assert_ok!(AcuityAtomicSwap::deposit_stash(Origin::signed(A), asset_id, 50));
+		assert_noop!(
+			AcuityAtomicSwap::withdraw_stash(Origin::signed(A), asset_id, 51),
+			Error::<Test>::StashNotBigEnough,
+		);
+	});
+}
+
+#[test]
 fn withdraw_stash() {
 	new_test_ext().execute_with(|| {
 		let mut asset_id = AcuityAssetId::default();
