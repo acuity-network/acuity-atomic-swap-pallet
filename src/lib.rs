@@ -365,7 +365,7 @@ pub mod pallet {
     #[pallet::storage]
     #[pallet::getter(fn lock_id_value)]
     pub(super) type LockIdValue<T: Config> = StorageMap<_,
-        Blake2_128Concat, AcuityLockId,
+        Identity, AcuityLockId,
         BalanceOf<T>
     >;
 
