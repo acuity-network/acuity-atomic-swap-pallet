@@ -38,25 +38,41 @@ fn deposit_stash() {
 		let stashes = AcuityAtomicSwap::get_stashes(asset_id, 0, 100);
 		assert_eq!(stashes.len(), 0);
 
+		let account_balance = Balances::free_balance(A);
+		let pallet_balance = Balances::free_balance(AcuityAtomicSwap::fund_account_id());
 		assert_ok!(AcuityAtomicSwap::deposit_stash(Origin::signed(A), asset_id, 50));
+		assert_eq!(Balances::free_balance(A), account_balance - 50);
+		assert_eq!(Balances::free_balance(AcuityAtomicSwap::fund_account_id()), pallet_balance + 50);
 		let stashes = AcuityAtomicSwap::get_stashes(asset_id, 0, 100);
 		assert_eq!(stashes.len(), 1);
 		assert_eq!(stashes[0], (A, 50));
 
+		let account_balance = Balances::free_balance(B);
+		let pallet_balance = Balances::free_balance(AcuityAtomicSwap::fund_account_id());
 		assert_ok!(AcuityAtomicSwap::deposit_stash(Origin::signed(B), asset_id, 40));
+		assert_eq!(Balances::free_balance(B), account_balance - 40);
+		assert_eq!(Balances::free_balance(AcuityAtomicSwap::fund_account_id()), pallet_balance + 40);
 		let stashes = AcuityAtomicSwap::get_stashes(asset_id, 0, 100);
 		assert_eq!(stashes.len(), 2);
 		assert_eq!(stashes[0], (A, 50));
 		assert_eq!(stashes[1], (B, 40));
 
+		let account_balance = Balances::free_balance(C);
+		let pallet_balance = Balances::free_balance(AcuityAtomicSwap::fund_account_id());
 		assert_ok!(AcuityAtomicSwap::deposit_stash(Origin::signed(C), asset_id, 60));
+		assert_eq!(Balances::free_balance(C), account_balance - 60);
+		assert_eq!(Balances::free_balance(AcuityAtomicSwap::fund_account_id()), pallet_balance + 60);
 		let stashes = AcuityAtomicSwap::get_stashes(asset_id, 0, 100);
 		assert_eq!(stashes.len(), 3);
 		assert_eq!(stashes[0], (C, 60));
 		assert_eq!(stashes[1], (A, 50));
 		assert_eq!(stashes[2], (B, 40));
 
+		let account_balance = Balances::free_balance(D);
+		let pallet_balance = Balances::free_balance(AcuityAtomicSwap::fund_account_id());
 		assert_ok!(AcuityAtomicSwap::deposit_stash(Origin::signed(D), asset_id, 45));
+		assert_eq!(Balances::free_balance(D), account_balance - 45);
+		assert_eq!(Balances::free_balance(AcuityAtomicSwap::fund_account_id()), pallet_balance + 45);
 		let stashes = AcuityAtomicSwap::get_stashes(asset_id, 0, 100);
 		assert_eq!(stashes.len(), 4);
 		assert_eq!(stashes[0], (C, 60));
@@ -64,7 +80,11 @@ fn deposit_stash() {
 		assert_eq!(stashes[2], (D, 45));
 		assert_eq!(stashes[3], (B, 40));
 
+		let account_balance = Balances::free_balance(A);
+		let pallet_balance = Balances::free_balance(AcuityAtomicSwap::fund_account_id());
 		assert_ok!(AcuityAtomicSwap::deposit_stash(Origin::signed(A), asset_id, 10));
+		assert_eq!(Balances::free_balance(A), account_balance - 10);
+		assert_eq!(Balances::free_balance(AcuityAtomicSwap::fund_account_id()), pallet_balance + 10);
 		let stashes = AcuityAtomicSwap::get_stashes(asset_id, 0, 100);
 		assert_eq!(stashes.len(), 4);
 		assert_eq!(stashes[0], (C, 60));
@@ -72,7 +92,11 @@ fn deposit_stash() {
 		assert_eq!(stashes[2], (D, 45));
 		assert_eq!(stashes[3], (B, 40));
 
+		let account_balance = Balances::free_balance(A);
+		let pallet_balance = Balances::free_balance(AcuityAtomicSwap::fund_account_id());
 		assert_ok!(AcuityAtomicSwap::deposit_stash(Origin::signed(A), asset_id, 1));
+		assert_eq!(Balances::free_balance(A), account_balance - 1);
+		assert_eq!(Balances::free_balance(AcuityAtomicSwap::fund_account_id()), pallet_balance + 1);
 		let stashes = AcuityAtomicSwap::get_stashes(asset_id, 0, 100);
 		assert_eq!(stashes.len(), 4);
 		assert_eq!(stashes[0], (A, 61));
@@ -90,30 +114,50 @@ fn withdraw_stash() {
 		let stashes = AcuityAtomicSwap::get_stashes(asset_id, 0, 100);
 		assert_eq!(stashes.len(), 0);
 
+		let account_balance = Balances::free_balance(A);
+		let pallet_balance = Balances::free_balance(AcuityAtomicSwap::fund_account_id());
 		assert_ok!(AcuityAtomicSwap::deposit_stash(Origin::signed(A), asset_id, 50));
+		assert_eq!(Balances::free_balance(A), account_balance - 50);
+		assert_eq!(Balances::free_balance(AcuityAtomicSwap::fund_account_id()), pallet_balance + 50);
 		let stashes = AcuityAtomicSwap::get_stashes(asset_id, 0, 100);
 		assert_eq!(stashes.len(), 1);
 		assert_eq!(stashes[0], (A, 50));
 
+		let account_balance = Balances::free_balance(A);
+		let pallet_balance = Balances::free_balance(AcuityAtomicSwap::fund_account_id());
 		assert_ok!(AcuityAtomicSwap::withdraw_stash(Origin::signed(A), asset_id, 2));
+		assert_eq!(Balances::free_balance(A), account_balance + 2);
+		assert_eq!(Balances::free_balance(AcuityAtomicSwap::fund_account_id()), pallet_balance - 2);
 		let stashes = AcuityAtomicSwap::get_stashes(asset_id, 0, 100);
 		assert_eq!(stashes.len(), 1);
 		assert_eq!(stashes[0], (A, 48));
 
+		let account_balance = Balances::free_balance(B);
+		let pallet_balance = Balances::free_balance(AcuityAtomicSwap::fund_account_id());
 		assert_ok!(AcuityAtomicSwap::deposit_stash(Origin::signed(B), asset_id, 40));
+		assert_eq!(Balances::free_balance(B), account_balance - 40);
+		assert_eq!(Balances::free_balance(AcuityAtomicSwap::fund_account_id()), pallet_balance + 40);
 		let stashes = AcuityAtomicSwap::get_stashes(asset_id, 0, 100);
 		assert_eq!(stashes.len(), 2);
 		assert_eq!(stashes[0], (A, 48));
 		assert_eq!(stashes[1], (B, 40));
 
+		let account_balance = Balances::free_balance(C);
+		let pallet_balance = Balances::free_balance(AcuityAtomicSwap::fund_account_id());
 		assert_ok!(AcuityAtomicSwap::deposit_stash(Origin::signed(C), asset_id, 60));
+		assert_eq!(Balances::free_balance(C), account_balance - 60);
+		assert_eq!(Balances::free_balance(AcuityAtomicSwap::fund_account_id()), pallet_balance + 60);
 		let stashes = AcuityAtomicSwap::get_stashes(asset_id, 0, 100);
 		assert_eq!(stashes.len(), 3);
 		assert_eq!(stashes[0], (C, 60));
 		assert_eq!(stashes[1], (A, 48));
 		assert_eq!(stashes[2], (B, 40));
 
+		let account_balance = Balances::free_balance(D);
+		let pallet_balance = Balances::free_balance(AcuityAtomicSwap::fund_account_id());
 		assert_ok!(AcuityAtomicSwap::deposit_stash(Origin::signed(D), asset_id, 45));
+		assert_eq!(Balances::free_balance(D), account_balance - 45);
+		assert_eq!(Balances::free_balance(AcuityAtomicSwap::fund_account_id()), pallet_balance + 45);
 		let stashes = AcuityAtomicSwap::get_stashes(asset_id, 0, 100);
 		assert_eq!(stashes.len(), 4);
 		assert_eq!(stashes[0], (C, 60));
@@ -121,7 +165,11 @@ fn withdraw_stash() {
 		assert_eq!(stashes[2], (D, 45));
 		assert_eq!(stashes[3], (B, 40));
 
+		let account_balance = Balances::free_balance(C);
+		let pallet_balance = Balances::free_balance(AcuityAtomicSwap::fund_account_id());
 		assert_ok!(AcuityAtomicSwap::withdraw_stash(Origin::signed(C), asset_id, 40));
+		assert_eq!(Balances::free_balance(C), account_balance + 40);
+		assert_eq!(Balances::free_balance(AcuityAtomicSwap::fund_account_id()), pallet_balance - 40);
 		let stashes = AcuityAtomicSwap::get_stashes(asset_id, 0, 100);
 		assert_eq!(stashes.len(), 4);
 		assert_eq!(stashes[0], (A, 48));
@@ -129,7 +177,11 @@ fn withdraw_stash() {
 		assert_eq!(stashes[2], (B, 40));
 		assert_eq!(stashes[3], (C, 20));
 
+		let account_balance = Balances::free_balance(A);
+		let pallet_balance = Balances::free_balance(AcuityAtomicSwap::fund_account_id());
 		assert_ok!(AcuityAtomicSwap::withdraw_stash(Origin::signed(A), asset_id, 3));
+		assert_eq!(Balances::free_balance(A), account_balance + 3);
+		assert_eq!(Balances::free_balance(AcuityAtomicSwap::fund_account_id()), pallet_balance - 3);
 		let stashes = AcuityAtomicSwap::get_stashes(asset_id, 0, 100);
 		assert_eq!(stashes.len(), 4);
 		assert_eq!(stashes[0], (D, 45));
@@ -137,25 +189,41 @@ fn withdraw_stash() {
 		assert_eq!(stashes[2], (B, 40));
 		assert_eq!(stashes[3], (C, 20));
 
+		let account_balance = Balances::free_balance(C);
+		let pallet_balance = Balances::free_balance(AcuityAtomicSwap::fund_account_id());
 		assert_ok!(AcuityAtomicSwap::withdraw_stash(Origin::signed(C), asset_id, 20));
+		assert_eq!(Balances::free_balance(C), account_balance + 20);
+		assert_eq!(Balances::free_balance(AcuityAtomicSwap::fund_account_id()), pallet_balance - 20);
 		let stashes = AcuityAtomicSwap::get_stashes(asset_id, 0, 100);
 		assert_eq!(stashes.len(), 3);
 		assert_eq!(stashes[0], (D, 45));
 		assert_eq!(stashes[1], (A, 45));
 		assert_eq!(stashes[2], (B, 40));
 
+		let account_balance = Balances::free_balance(D);
+		let pallet_balance = Balances::free_balance(AcuityAtomicSwap::fund_account_id());
 		assert_ok!(AcuityAtomicSwap::withdraw_stash(Origin::signed(D), asset_id, 45));
+		assert_eq!(Balances::free_balance(D), account_balance + 45);
+		assert_eq!(Balances::free_balance(AcuityAtomicSwap::fund_account_id()), pallet_balance - 45);
 		let stashes = AcuityAtomicSwap::get_stashes(asset_id, 0, 100);
 		assert_eq!(stashes.len(), 2);
 		assert_eq!(stashes[0], (A, 45));
 		assert_eq!(stashes[1], (B, 40));
 
+		let account_balance = Balances::free_balance(A);
+		let pallet_balance = Balances::free_balance(AcuityAtomicSwap::fund_account_id());
 		assert_ok!(AcuityAtomicSwap::withdraw_stash(Origin::signed(A), asset_id, 45));
+		assert_eq!(Balances::free_balance(A), account_balance + 45);
+		assert_eq!(Balances::free_balance(AcuityAtomicSwap::fund_account_id()), pallet_balance - 45);
 		let stashes = AcuityAtomicSwap::get_stashes(asset_id, 0, 100);
 		assert_eq!(stashes.len(), 1);
 		assert_eq!(stashes[0], (B, 40));
 
+		let account_balance = Balances::free_balance(B);
+		let pallet_balance = Balances::free_balance(AcuityAtomicSwap::fund_account_id());
 		assert_ok!(AcuityAtomicSwap::withdraw_stash(Origin::signed(B), asset_id, 40));
+		assert_eq!(Balances::free_balance(B), account_balance + 40);
+		assert_eq!(Balances::free_balance(AcuityAtomicSwap::fund_account_id()), pallet_balance - 40);
 		let stashes = AcuityAtomicSwap::get_stashes(asset_id, 0, 100);
 		assert_eq!(stashes.len(), 0);
 	});
