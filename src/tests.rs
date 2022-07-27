@@ -6,163 +6,83 @@ use super::*;
 
 const A: u64 = 1;
 const B: u64 = 2;
-
-//use AcuityAtomicSwap::AcuityOrderId;
+const C: u64 = 3;
+const D: u64 = 4;
 
 #[test]
-fn add_to_order() {
+fn deposit_stash_control_zero_value() {
 	new_test_ext().execute_with(|| {
-        let price: u128 = 5;
-		assert_ok!(AcuityAtomicSwap::add_to_order(Origin::signed(A), AcuityChainId::default(), AcuityAdapterId::default(), AcuityAssetId::default(), price, AcuityForeignAddress::default(), 50));
-
-        assert_eq!(Balances::free_balance(A), 50);
-        assert_eq!(Balances::free_balance(AcuityAtomicSwap::fund_account_id()), 50);
-
-        let order_id = AcuityAtomicSwap::get_order_id(A, AcuityChainId::default(), AcuityAdapterId::default(), AcuityAssetId::default(), price, AcuityForeignAddress::default());
-
-        assert_eq!(AcuityAtomicSwap::order_id_value(order_id), 50);
-
+		let mut asset_id = AcuityAssetId::default();
+		asset_id.0.copy_from_slice(&[1; 16]);
+		assert_ok!(AcuityAtomicSwap::deposit_stash(Origin::signed(A), asset_id, 50));
 	});
 }
 
 #[test]
-fn change_order_control_order_to_small() {
+fn deposit_stash_fail_zero_value() {
 	new_test_ext().execute_with(|| {
-        let price: u128 = 5;
-        let mut asset_id_new = AcuityAssetId::default();
-        asset_id_new.0.copy_from_slice(&[1; 8]);
-        assert_ok!(AcuityAtomicSwap::add_to_order(Origin::signed(A), AcuityChainId::default(), AcuityAdapterId::default(), AcuityAssetId::default(), price, AcuityForeignAddress::default(), 50));
-        assert_ok!(AcuityAtomicSwap::change_order(Origin::signed(A), AcuityChainId::default(), AcuityAdapterId::default(), AcuityAssetId::default(), price, AcuityForeignAddress::default(), AcuityChainId::default(), AcuityAdapterId::default(), asset_id_new, price, AcuityForeignAddress::default(), 50));
-	});
-}
-
-#[test]
-fn change_order_fail_order_to_small() {
-	new_test_ext().execute_with(|| {
-        let price: u128 = 5;
-        let mut asset_id_new = AcuityAssetId::default();
-        asset_id_new.0.copy_from_slice(&[1; 8]);
-        assert_ok!(AcuityAtomicSwap::add_to_order(Origin::signed(A), AcuityChainId::default(), AcuityAdapterId::default(), AcuityAssetId::default(), price, AcuityForeignAddress::default(), 50));
+		let mut asset_id = AcuityAssetId::default();
+		asset_id.0.copy_from_slice(&[1; 16]);
 		assert_noop!(
-            AcuityAtomicSwap::change_order(Origin::signed(A), AcuityChainId::default(), AcuityAdapterId::default(), AcuityAssetId::default(), price, AcuityForeignAddress::default(), AcuityChainId::default(), AcuityAdapterId::default(), asset_id_new, price, AcuityForeignAddress::default(), 51),
-			Error::<Test>::OrderTooSmall
+			AcuityAtomicSwap::deposit_stash(Origin::signed(A), asset_id, 0),
+			Error::<Test>::ZeroValue,
 		);
 	});
 }
 
 #[test]
-fn change_order() {
+fn deposit_stash() {
 	new_test_ext().execute_with(|| {
-        let price: u128 = 5;
-        let mut asset_id_new = AcuityAssetId::default();
-        asset_id_new.0.copy_from_slice(&[1; 8]);
-		assert_ok!(AcuityAtomicSwap::add_to_order(Origin::signed(A), AcuityChainId::default(), AcuityAdapterId::default(), AcuityAssetId::default(), price, AcuityForeignAddress::default(), 50));
+		let mut asset_id = AcuityAssetId::default();
+		asset_id.0.copy_from_slice(&[1; 16]);
+		let stashes = AcuityAtomicSwap::get_stashes(asset_id, 0, 100);
+		assert_eq!(stashes.len(), 0);
 
-        assert_eq!(Balances::free_balance(A), 50);
-        assert_eq!(Balances::free_balance(AcuityAtomicSwap::fund_account_id()), 50);
+		assert_ok!(AcuityAtomicSwap::deposit_stash(Origin::signed(A), asset_id, 50));
+		let stashes = AcuityAtomicSwap::get_stashes(asset_id, 0, 100);
+		assert_eq!(stashes.len(), 1);
+		assert_eq!(stashes[0], (A, 50));
 
-        let order_id = AcuityAtomicSwap::get_order_id(A, AcuityChainId::default(), AcuityAdapterId::default(), AcuityAssetId::default(), price, AcuityForeignAddress::default());
+		assert_ok!(AcuityAtomicSwap::deposit_stash(Origin::signed(B), asset_id, 40));
+		let stashes = AcuityAtomicSwap::get_stashes(asset_id, 0, 100);
+		assert_eq!(stashes.len(), 2);
+		assert_eq!(stashes[0], (A, 50));
+		assert_eq!(stashes[1], (B, 40));
 
-        assert_eq!(AcuityAtomicSwap::order_id_value(order_id), 50);
+		assert_ok!(AcuityAtomicSwap::deposit_stash(Origin::signed(C), asset_id, 60));
+		let stashes = AcuityAtomicSwap::get_stashes(asset_id, 0, 100);
+		assert_eq!(stashes.len(), 3);
+		assert_eq!(stashes[0], (C, 60));
+		assert_eq!(stashes[1], (A, 50));
+		assert_eq!(stashes[2], (B, 40));
 
-        assert_ok!(AcuityAtomicSwap::change_order(Origin::signed(A), AcuityChainId::default(), AcuityAdapterId::default(), AcuityAssetId::default(), price, AcuityForeignAddress::default(), AcuityChainId::default(), AcuityAdapterId::default(), asset_id_new, price, AcuityForeignAddress::default(), 50));
-        assert_eq!(Balances::free_balance(A), 50);
-        assert_eq!(Balances::free_balance(AcuityAtomicSwap::fund_account_id()), 50);
-        assert_eq!(AcuityAtomicSwap::order_id_value(order_id), 0);
+		assert_ok!(AcuityAtomicSwap::deposit_stash(Origin::signed(D), asset_id, 45));
+		let stashes = AcuityAtomicSwap::get_stashes(asset_id, 0, 100);
+		assert_eq!(stashes.len(), 4);
+		assert_eq!(stashes[0], (C, 60));
+		assert_eq!(stashes[1], (A, 50));
+		assert_eq!(stashes[2], (D, 45));
+		assert_eq!(stashes[3], (B, 40));
 
-        let new_order_id = AcuityAtomicSwap::get_order_id(A, AcuityChainId::default(), AcuityAdapterId::default(), asset_id_new, price, AcuityForeignAddress::default());
-        assert_eq!(AcuityAtomicSwap::order_id_value(new_order_id), 50);
+		assert_ok!(AcuityAtomicSwap::deposit_stash(Origin::signed(A), asset_id, 10));
+		let stashes = AcuityAtomicSwap::get_stashes(asset_id, 0, 100);
+		assert_eq!(stashes.len(), 4);
+		assert_eq!(stashes[0], (C, 60));
+		assert_eq!(stashes[1], (A, 60));
+		assert_eq!(stashes[2], (D, 45));
+		assert_eq!(stashes[3], (B, 40));
+
+		assert_ok!(AcuityAtomicSwap::deposit_stash(Origin::signed(A), asset_id, 1));
+		let stashes = AcuityAtomicSwap::get_stashes(asset_id, 0, 100);
+		assert_eq!(stashes.len(), 4);
+		assert_eq!(stashes[0], (A, 61));
+		assert_eq!(stashes[1], (C, 60));
+		assert_eq!(stashes[2], (D, 45));
+		assert_eq!(stashes[3], (B, 40));
 	});
 }
 
-#[test]
-fn change_order_all() {
-	new_test_ext().execute_with(|| {
-        let price: u128 = 5;
-        let mut asset_id_new = AcuityAssetId::default();
-        asset_id_new.0.copy_from_slice(&[1; 8]);
-		assert_ok!(AcuityAtomicSwap::add_to_order(Origin::signed(A), AcuityChainId::default(), AcuityAdapterId::default(), AcuityAssetId::default(), price, AcuityForeignAddress::default(), 50));
-
-        assert_eq!(Balances::free_balance(A), 50);
-        assert_eq!(Balances::free_balance(AcuityAtomicSwap::fund_account_id()), 50);
-
-        let order_id = AcuityAtomicSwap::get_order_id(A, AcuityChainId::default(), AcuityAdapterId::default(), AcuityAssetId::default(), price, AcuityForeignAddress::default());
-
-        assert_eq!(AcuityAtomicSwap::order_id_value(order_id), 50);
-
-        assert_ok!(AcuityAtomicSwap::change_order_all(Origin::signed(A), AcuityChainId::default(), AcuityAdapterId::default(), AcuityAssetId::default(), price, AcuityForeignAddress::default(), AcuityChainId::default(), AcuityAdapterId::default(), asset_id_new, price, AcuityForeignAddress::default()));
-        assert_eq!(Balances::free_balance(A), 50);
-        assert_eq!(Balances::free_balance(AcuityAtomicSwap::fund_account_id()), 50);
-        assert_eq!(AcuityAtomicSwap::order_id_value(order_id), 0);
-
-        let new_order_id = AcuityAtomicSwap::get_order_id(A, AcuityChainId::default(), AcuityAdapterId::default(), asset_id_new, price, AcuityForeignAddress::default());
-        assert_eq!(AcuityAtomicSwap::order_id_value(new_order_id), 50);
-	});
-}
-
-#[test]
-fn remove_from_order_control_order_to_small() {
-	new_test_ext().execute_with(|| {
-        let price: u128 = 5;
-        assert_ok!(AcuityAtomicSwap::add_to_order(Origin::signed(A), AcuityChainId::default(), AcuityAdapterId::default(), AcuityAssetId::default(), price, AcuityForeignAddress::default(), 50));
-        assert_ok!(AcuityAtomicSwap::remove_from_order(Origin::signed(A), AcuityChainId::default(), AcuityAdapterId::default(), AcuityAssetId::default(), price, AcuityForeignAddress::default(), 50));
-	});
-}
-
-#[test]
-fn remove_from_order_fail_order_to_small() {
-	new_test_ext().execute_with(|| {
-        let price: u128 = 5;
-        assert_ok!(AcuityAtomicSwap::add_to_order(Origin::signed(A), AcuityChainId::default(), AcuityAdapterId::default(), AcuityAssetId::default(), price, AcuityForeignAddress::default(), 50));
-		assert_noop!(
-            AcuityAtomicSwap::remove_from_order(Origin::signed(A), AcuityChainId::default(), AcuityAdapterId::default(), AcuityAssetId::default(), price, AcuityForeignAddress::default(), 51),
-			Error::<Test>::OrderTooSmall
-		);
-	});
-}
-
-#[test]
-fn remove_from_order() {
-	new_test_ext().execute_with(|| {
-        let price: u128 = 5;
-		assert_ok!(AcuityAtomicSwap::add_to_order(Origin::signed(A), AcuityChainId::default(), AcuityAdapterId::default(), AcuityAssetId::default(), price, AcuityForeignAddress::default(), 50));
-
-        assert_eq!(Balances::free_balance(A), 50);
-        assert_eq!(Balances::free_balance(AcuityAtomicSwap::fund_account_id()), 50);
-
-        let order_id = AcuityAtomicSwap::get_order_id(A, AcuityChainId::default(), AcuityAdapterId::default(), AcuityAssetId::default(), price, AcuityForeignAddress::default());
-
-        assert_eq!(AcuityAtomicSwap::order_id_value(order_id), 50);
-
-        assert_ok!(AcuityAtomicSwap::remove_from_order(Origin::signed(A), AcuityChainId::default(), AcuityAdapterId::default(), AcuityAssetId::default(), price, AcuityForeignAddress::default(), 50));
-        assert_eq!(Balances::free_balance(A), 100);
-        assert_eq!(Balances::free_balance(AcuityAtomicSwap::fund_account_id()), 0);
-        assert_eq!(AcuityAtomicSwap::order_id_value(order_id), 0);
-
-	});
-}
-
-#[test]
-fn remove_from_order_all() {
-	new_test_ext().execute_with(|| {
-        let price: u128 = 5;
-		assert_ok!(AcuityAtomicSwap::add_to_order(Origin::signed(A), AcuityChainId::default(), AcuityAdapterId::default(), AcuityAssetId::default(), price, AcuityForeignAddress::default(), 50));
-
-        assert_eq!(Balances::free_balance(A), 50);
-        assert_eq!(Balances::free_balance(AcuityAtomicSwap::fund_account_id()), 50);
-
-        let order_id = AcuityAtomicSwap::get_order_id(A, AcuityChainId::default(), AcuityAdapterId::default(), AcuityAssetId::default(), price, AcuityForeignAddress::default());
-
-        assert_eq!(AcuityAtomicSwap::order_id_value(order_id), 50);
-
-        assert_ok!(AcuityAtomicSwap::remove_from_order_all(Origin::signed(A), AcuityChainId::default(), AcuityAdapterId::default(), AcuityAssetId::default(), price, AcuityForeignAddress::default()));
-        assert_eq!(Balances::free_balance(A), 100);
-        assert_eq!(Balances::free_balance(AcuityAtomicSwap::fund_account_id()), 0);
-        assert_eq!(AcuityAtomicSwap::order_id_value(order_id), 0);
-
-	});
-}
-
+/*
 #[test]
 fn lock_sell_control_too_small() {
     new_test_ext().execute_with(|| {
@@ -552,3 +472,4 @@ fn timeout_buy() {
         assert_eq!(AcuityAtomicSwap::buy_lock(B, hashed_secret), None);
 	});
 }
+*/

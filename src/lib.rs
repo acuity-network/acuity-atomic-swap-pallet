@@ -399,7 +399,7 @@ pub mod pallet {
             let mut prev = zero_account_id.clone();
             loop {
                 let next = match <StashLL<T>>::get(asset_id, &prev) {
-                    Some(p) => p,
+                    Some(account) => account,
                     None => break,
                 };
                 let value = <StashValue<T>>::get(asset_id, &next);
@@ -415,7 +415,7 @@ pub mod pallet {
                 let mut old_prev = zero_account_id;
                 loop {
                     let next = match <StashLL<T>>::get(asset_id, &old_prev) {
-                        Some(p) => p,
+                        Some(account) => account,
                         None => break,
                     };
                     if next == account {
@@ -429,21 +429,24 @@ pub mod pallet {
                 }
                 else {
                     // Remove sender from current position.
-                    let next = <StashLL<T>>::get(asset_id, &account).unwrap();
-                    <StashLL<T>>::insert(asset_id, old_prev, next);
+                    match <StashLL<T>>::get(asset_id, &account) {
+                        Some(next) => <StashLL<T>>::insert(asset_id, old_prev, next),
+                        None => <StashLL<T>>::remove(asset_id, old_prev),
+                    };
                 }
-                if !replace {
-                    // Insert into linked list.
-                    let next = <StashLL<T>>::get(asset_id, &prev).unwrap();
-                    <StashLL<T>>::insert(asset_id, &account, next);
-                    <StashLL<T>>::insert(asset_id, &prev, &account);
-                }
-                // Update the value deposited.
-                <StashValue<T>>::insert(asset_id, &account, total);
-                // Log info.
-                Self::deposit_event(Event::StashAdd(account, asset_id, value));
             }
-
+            if !replace {
+                // Insert into linked list.
+                match <StashLL<T>>::get(asset_id, &prev) {
+                    Some(next) => <StashLL<T>>::insert(asset_id, &account, next),
+                    None => {},
+                };
+                <StashLL<T>>::insert(asset_id, &prev, &account);
+            }
+            // Update the value deposited.
+            <StashValue<T>>::insert(asset_id, &account, total);
+            // Log info.
+            Self::deposit_event(Event::StashAdd(account, asset_id, value));
     	}
 
         pub fn stash_remove(asset_id: AcuityAssetId, account: T::AccountId, value: BalanceOf<T>) {
@@ -454,7 +457,7 @@ pub mod pallet {
             let mut old_prev = zero_account_id.clone();
             loop {
                 let next = match <StashLL<T>>::get(asset_id, &old_prev) {
-                    Some(p) => p,
+                    Some(account) => account,
                     None => break,
                 };
                 if next == account {
@@ -468,7 +471,7 @@ pub mod pallet {
                 let mut prev = zero_account_id;
                 loop {
                     let next = match <StashLL<T>>::get(asset_id, &prev) {
-                        Some(p) => p,
+                        Some(account) => account,
                         None => break,
                     };
                     let value = <StashValue<T>>::get(asset_id, &next);
@@ -480,18 +483,24 @@ pub mod pallet {
                 // Is it in a new position?
                 if prev != account {
                     // Remove sender from old position.
-                    let next = <StashLL<T>>::get(asset_id, &account).unwrap();
-                    <StashLL<T>>::insert(asset_id, old_prev, next);
+                    match <StashLL<T>>::get(asset_id, &account) {
+                        Some(next) => <StashLL<T>>::insert(asset_id, old_prev, next),
+                        None => <StashLL<T>>::remove(asset_id, old_prev),
+                    };
                     // Insert into new position.
-                    let next = <StashLL<T>>::get(asset_id, &prev).unwrap();
-                    <StashLL<T>>::insert(asset_id, &account, next);
+                    match <StashLL<T>>::get(asset_id, &prev) {
+                        Some(next) => <StashLL<T>>::insert(asset_id, &account, next),
+                        None => {},
+                    };
                     <StashLL<T>>::insert(asset_id, &prev, &account);
                 }
             }
             else {
                 // Remove sender from current position.
-                let next = <StashLL<T>>::get(asset_id, &account).unwrap();
-                <StashLL<T>>::insert(asset_id, old_prev, next);
+                match <StashLL<T>>::get(asset_id, &account) {
+                    Some(next) => <StashLL<T>>::insert(asset_id, old_prev, next),
+                    None => <StashLL<T>>::remove(asset_id, old_prev),
+                };
             }
             // Update the value deposited.
             <StashValue<T>>::insert(asset_id, &account, total);
@@ -530,22 +539,22 @@ pub mod pallet {
                     break;
                 }
                 account = match <StashLL<T>>::get(asset_id, &account) {
-                    Some(p) => p,
+                    Some(account) => account,
                     None => return sp_std::prelude::Vec::new(),
                 };
-                offset = offset - 1;
+                offset -= 1;
             }
             let mut stashes = sp_std::prelude::Vec::new();
             loop {
                 if limit == 0 {
                     break;
                 }
-                stashes.push((account.clone(), <StashValue<T>>::get(asset_id, &account)));
                 account = match <StashLL<T>>::get(asset_id, &account) {
-                    Some(p) => p,
+                    Some(account) => account,
                     None => break,
                 };
-                limit = limit - 1;
+                stashes.push((account.clone(), <StashValue<T>>::get(asset_id, &account)));
+                limit -= 1;
             }
             stashes
         }
