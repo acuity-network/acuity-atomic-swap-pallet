@@ -36,7 +36,7 @@ mod tests;
 ///
 /// This gets serialized to the 0x-prefixed hex representation.
 #[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, Default, RuntimeDebug, TypeInfo, MaxEncodedLen)]
-pub struct AcuityAssetId([u8; 16]);
+pub struct AcuityAssetId([u8; 32]);
 
 /// A lock ID (i.e. 32 bytes).
 ///
@@ -92,7 +92,6 @@ pub mod pallet {
             // Move the value from the sender to the pallet.
             T::Currency::transfer(&sender, &Self::fund_account_id(), value, AllowDeath)
             				.map_err(|_| DispatchError::Other("Can't transfer value."))?;
-
             Self::stash_add(asset_id, sender, value);
             Ok(().into())
         }
@@ -148,7 +147,7 @@ pub mod pallet {
             // Move the value from the sender to the pallet.
             T::Currency::transfer(&buyer, &Self::fund_account_id(), value, AllowDeath)
             				.map_err(|_| DispatchError::Other("Can't transfer value."))?;
-                            // Move value into buy lock.
+            // Move value into buy lock.
             <LockIdValue<T>>::insert(lock_id, value);
             // Index event.
             Self::index_account(buyer.clone());
