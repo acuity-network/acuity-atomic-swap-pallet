@@ -3,8 +3,6 @@
 #[cfg(not(feature = "std"))]
 use sp_std::prelude::Vec;
 
-pub use pallet_acuity_atomic_swap::{AcuityAssetId};
-
 sp_api::decl_runtime_apis! {
     pub trait AtomicSwapApi<AcuityAssetId, AccountId, Balance, BlockNumber> where
         AcuityAssetId: codec::Codec,
