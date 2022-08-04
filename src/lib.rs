@@ -25,6 +25,7 @@ use sp_runtime::{
 
 
 use codec::{Encode, Decode};
+use serde::{Deserialize, Serialize};
 
 #[cfg(test)]
 mod mock;
@@ -35,7 +36,7 @@ mod tests;
 /// An Asset Id (i.e. 8 bytes).
 ///
 /// This gets serialized to the 0x-prefixed hex representation.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, Default, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, Default, RuntimeDebug, TypeInfo, MaxEncodedLen, Serialize, Deserialize)]
 pub struct AcuityAssetId([u8; 32]);
 
 /// A lock ID (i.e. 32 bytes).
