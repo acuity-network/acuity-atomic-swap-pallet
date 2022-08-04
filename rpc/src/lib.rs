@@ -14,7 +14,7 @@ use sp_runtime::{
 use std::sync::Arc;
 
 pub use pallet_acuity_atomic_swap_rpc_runtime_api::AtomicSwapApi as AtomicSwapRuntimeApi;
-use pallet_acuity_atomic_swap::AcuityAssetId;
+pub use pallet_acuity_atomic_swap::AcuityAssetId;
 
 #[rpc(client, server)]
 pub trait AtomicSwapApi<AcuityAssetId, AccountId, BalanceOf, BlockNumber, BlockHash> {
