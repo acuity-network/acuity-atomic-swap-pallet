@@ -22,7 +22,7 @@ sp-std = { default-features = false, git = 'https://github.com/paritytech/substr
 sp-runtime = { default-features = false, git = 'https://github.com/paritytech/substrate', branch = "polkadot-v0.9.26" }
 sp-io = { default-features = false, git = 'https://github.com/paritytech/substrate', branch = "polkadot-v0.9.26" }
 pallet-timestamp = { default-features = false, git = 'https://github.com/paritytech/substrate', branch = "polkadot-v0.9.26" }
-serde = "1.0.142"
+serde = { version = "1.0.137", default-features = false }
 
 [dev-dependencies]
 sp-core = { default-features = false, git = 'https://github.com/paritytech/substrate', branch = "polkadot-v0.9.26" }
