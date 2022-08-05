@@ -33,11 +33,41 @@ mod mock;
 #[cfg(test)]
 mod tests;
 
+/// Serialization shim for arbitrary arrays that is consistent with `polkadot-js`'s implementation.
+///
+/// `polkadot-js` sends us a `0x01020304`, but the default rust implementation for arrays expects a
+/// `[0x01, 0x02, 0x03, 0x04]`. Here, we use a similar serialization as substrate uses for `vec`,
+/// but we transform it to an array before returning.
+pub mod serialize_array {
+	use impl_serde::serialize::{deserialize_check_len, ExpectedLen};
+	use serde::Deserializer;
+
+	// default serialize is fine
+	pub use impl_serde::serialize::serialize;
+
+	pub use deserialize_array as deserialize;
+
+	pub fn deserialize_array<'de, D, const T: usize>(deserializer: D) -> Result<[u8; T], D::Error>
+	where
+		D: Deserializer<'de>,
+	{
+		// All hail the stable const generics!
+		let mut arr = [0u8; T];
+		deserialize_check_len(deserializer, ExpectedLen::Exact(&mut arr[..]))?;
+
+		Ok(arr)
+	}
+}
+
 /// An Asset Id (i.e. 8 bytes).
 ///
 /// This gets serialized to the 0x-prefixed hex representation.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, Default, RuntimeDebug, TypeInfo, MaxEncodedLen, Serialize, Deserialize)]
-pub struct AcuityAssetId([u8; 32]);
+#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, Default, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+#[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
+pub struct AcuityAssetId(
+    #[cfg_attr(feature = "std", serde(with = "serialize_array"))]
+    [u8; 32]
+);
 
 /// A lock ID (i.e. 32 bytes).
 ///
