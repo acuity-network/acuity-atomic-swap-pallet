@@ -25,6 +25,7 @@ use sp_runtime::{
 
 
 use codec::{Encode, Decode};
+#[cfg(feature = "serde_derive")]
 use serde::{Deserialize, Serialize};
 
 #[cfg(test)]
@@ -38,6 +39,7 @@ mod tests;
 /// `polkadot-js` sends us a `0x01020304`, but the default rust implementation for arrays expects a
 /// `[0x01, 0x02, 0x03, 0x04]`. Here, we use a similar serialization as substrate uses for `vec`,
 /// but we transform it to an array before returning.
+#[cfg(feature = "serde_derive")]
 pub mod serialize_array {
 	use impl_serde::serialize::{deserialize_check_len, ExpectedLen};
 	use serde::Deserializer;
