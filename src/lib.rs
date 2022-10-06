@@ -8,7 +8,7 @@ use frame_support::{
     PalletId,
 };
 use scale_info::TypeInfo;
-use sp_io::hashing::{blake2_128, keccak_256};
+use sp_io::hashing::{blake2_256, keccak_256};
 
 pub use pallet::*;
 
@@ -337,7 +337,7 @@ pub mod pallet {
 
         pub fn get_lock_id(sender: T::AccountId, recipient: T::AccountId, hashed_secret: AcuityHashedSecret, timeout: T::Moment) -> AcuityLockId {
             let mut lock_id = AcuityLockId::default();
-    		lock_id.0.copy_from_slice(&blake2_128(&[sender.encode(), recipient.encode(), hashed_secret.encode(), timeout.encode()].concat()));
+    		lock_id.0.copy_from_slice(&blake2_256(&[sender.encode(), recipient.encode(), hashed_secret.encode(), timeout.encode()].concat()));
             lock_id
         }
 
