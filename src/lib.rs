@@ -98,17 +98,18 @@ pub mod pallet {
 	use super::*;
 
 	#[pallet::pallet]
-	#[pallet::generate_store(trait Store)]
-	pub struct Pallet<T>(PhantomData<T>);
+	#[pallet::generate_store(pub(super) trait Store)]
+	pub struct Pallet<T>(_);
 
+	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
     pub trait Config: pallet_timestamp::Config + frame_system::Config {
+		/// Because this pallet emits events, it depends on the runtime's definition of an event.
+		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
+
         /// PalletId for the crowdloan pallet. An appropriate value could be ```PalletId(*b"py/cfund")```
 		#[pallet::constant]
 		type PalletId: Get<PalletId>;
-
-		/// The overarching event type.
-		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
 
         /// The currency type that the charity deals in
         type Currency: Currency<Self::AccountId>;
