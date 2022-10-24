@@ -141,7 +141,7 @@ pub mod pallet {
 		}
 
         #[pallet::weight(50_000_000)]
-		pub fn lock_sell(origin: OriginFor<T>, recipient: T::AccountId, hashed_secret: AcuityHashedSecret, timeout: T::Moment, stash_asset_id: AcuityAssetId, value: BalanceOf<T>, buy_lock_id: AcuityLockId) -> DispatchResultWithPostInfo {
+		pub fn lock_sell(origin: OriginFor<T>, recipient: T::AccountId, hashed_secret: AcuityHashedSecret, timeout: T::Moment, value: BalanceOf<T>, buy_asset_id: AcuityAssetId, buy_lock_id: AcuityLockId) -> DispatchResultWithPostInfo {
             let seller = ensure_signed(origin)?;
             // Ensure value is nonzero.
             frame_support::ensure!(!value.is_zero(), Error::<T>::ZeroValue);
@@ -158,7 +158,7 @@ pub mod pallet {
             Self::index_account(seller.clone());
             Self::index_account(recipient.clone());
             // Log info.
-            Self::deposit_event(Event::SellLock(seller, recipient, hashed_secret, timeout, value, lock_id, stash_asset_id, buy_lock_id));
+            Self::deposit_event(Event::SellLock(seller, recipient, hashed_secret, timeout, value, lock_id, buy_asset_id, buy_lock_id));
 			Ok(().into())
 		}
 
