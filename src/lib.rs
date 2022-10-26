@@ -129,7 +129,7 @@ pub mod pallet {
             ensure!(!LockIdValue::<T>::contains_key(lock_id), Error::<T>::LockAlreadyExists);
             // Move the value from the sender to the pallet.
             T::Currency::transfer(&buyer, &Self::fund_account_id(), value, AllowDeath)
-            				.map_err(|_| DispatchError::Other("Can't transfer value."))?;
+                .map_err(|_| DispatchError::Other("Can't transfer value."))?;
             // Move value into buy lock.
             <LockIdValue<T>>::insert(lock_id, value);
             // Index event.
@@ -151,7 +151,7 @@ pub mod pallet {
             ensure!(!LockIdValue::<T>::contains_key(lock_id), Error::<T>::LockAlreadyExists);
             // Move the value from the sender to the pallet.
             T::Currency::transfer(&seller, &Self::fund_account_id(), value, AllowDeath)
-            				.map_err(|_| DispatchError::Other("Can't transfer value."))?;
+                .map_err(|_| DispatchError::Other("Can't transfer value."))?;
             // Move value into sell lock.
             <LockIdValue<T>>::insert(lock_id, value);
             // Index event.
@@ -176,7 +176,7 @@ pub mod pallet {
             LockIdValue::<T>::remove(lock_id);
             // Transfer the value back to the sender.
             T::Currency::transfer(&Self::fund_account_id(), &sender, value, AllowDeath)
-            				.map_err(|_| DispatchError::Other("Can't transfer value."))?;
+                .map_err(|_| DispatchError::Other("Can't transfer value."))?;
             // Index event.
             Self::index_account(sender.clone());
             Self::index_account(recipient.clone());
@@ -204,7 +204,7 @@ pub mod pallet {
             LockIdValue::<T>::remove(lock_id);
             // Transfer the value.
             T::Currency::transfer(&Self::fund_account_id(), &recipient, value, AllowDeath)
-            				.map_err(|_| DispatchError::Other("Can't transfer value."))?;
+                .map_err(|_| DispatchError::Other("Can't transfer value."))?;
             // Index event.
             Self::index_account(sender.clone());
             Self::index_account(recipient.clone());
@@ -232,7 +232,7 @@ pub mod pallet {
             LockIdValue::<T>::remove(lock_id);
             // Transfer the value.
             T::Currency::transfer(&Self::fund_account_id(), &recipient, value, AllowDeath)
-            				.map_err(|_| DispatchError::Other("Can't transfer value."))?;
+                .map_err(|_| DispatchError::Other("Can't transfer value."))?;
             // Index event.
             Self::index_account(sender.clone());
             Self::index_account(recipient.clone());
@@ -257,7 +257,7 @@ pub mod pallet {
             LockIdValue::<T>::remove(lock_id);
             // Transfer the value.
             T::Currency::transfer(&Self::fund_account_id(), &sender, value, AllowDeath)
-            				.map_err(|_| DispatchError::Other("Can't transfer value."))?;
+                .map_err(|_| DispatchError::Other("Can't transfer value."))?;
             // Index event.
             Self::index_account(sender.clone());
             Self::index_account(recipient.clone());
