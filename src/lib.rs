@@ -120,79 +120,88 @@ pub mod pallet {
 
         #[pallet::weight(50_000_000)]
 		pub fn lock_buy(origin: OriginFor<T>, recipient: T::AccountId, hashed_secret: AcuityHashedSecret, timeout: T::Moment, value: BalanceOf<T>, sell_asset_id: AcuityAssetId, sell_price: u128) -> DispatchResultWithPostInfo {
-            let buyer = ensure_signed(origin)?;
+            let creator = ensure_signed(origin)?;
             // Ensure value is nonzero.
             frame_support::ensure!(!value.is_zero(), Error::<T>::ZeroValue);
             // Calculate lock_id.
-            let lock_id = Self::get_lock_id(buyer.clone(), recipient.clone(), hashed_secret, timeout);
+            let lock_id = Self::get_lock_id(creator.clone(), recipient.clone(), hashed_secret, timeout);
             // Ensure lock_id is not already in use.
             ensure!(!LockIdValue::<T>::contains_key(lock_id), Error::<T>::LockAlreadyExists);
+
+            //----------------------------------------
+
             // Move the value from the sender to the pallet.
-            T::Currency::transfer(&buyer, &Self::fund_account_id(), value, AllowDeath)
+            T::Currency::transfer(&creator, &Self::fund_account_id(), value, AllowDeath)
                 .map_err(|_| DispatchError::Other("Can't transfer value."))?;
             // Move value into buy lock.
             <LockIdValue<T>>::insert(lock_id, value);
             // Index event.
-            Self::index_account(buyer.clone());
+            Self::index_account(creator.clone());
             Self::index_account(recipient.clone());
             // Log info.
-            Self::deposit_event(Event::BuyLock(buyer, recipient, hashed_secret, timeout, value, lock_id, sell_asset_id, sell_price));
+            Self::deposit_event(Event::LockBuy(creator, recipient, hashed_secret, timeout, value, sell_asset_id, sell_price));
 			Ok(().into())
 		}
 
         #[pallet::weight(50_000_000)]
 		pub fn lock_sell(origin: OriginFor<T>, recipient: T::AccountId, hashed_secret: AcuityHashedSecret, timeout: T::Moment, value: BalanceOf<T>, buy_asset_id: AcuityAssetId, buy_lock_id: AcuityLockId) -> DispatchResultWithPostInfo {
-            let seller = ensure_signed(origin)?;
+            let creator = ensure_signed(origin)?;
             // Ensure value is nonzero.
             frame_support::ensure!(!value.is_zero(), Error::<T>::ZeroValue);
             // Calculate lock_id.
-            let lock_id = Self::get_lock_id(seller.clone(), recipient.clone(), hashed_secret, timeout);
+            let lock_id = Self::get_lock_id(creator.clone(), recipient.clone(), hashed_secret, timeout);
             // Ensure lock_id is not already in use.
             ensure!(!LockIdValue::<T>::contains_key(lock_id), Error::<T>::LockAlreadyExists);
+
+            //----------------------------------------
+
             // Move the value from the sender to the pallet.
-            T::Currency::transfer(&seller, &Self::fund_account_id(), value, AllowDeath)
+            T::Currency::transfer(&creator, &Self::fund_account_id(), value, AllowDeath)
                 .map_err(|_| DispatchError::Other("Can't transfer value."))?;
             // Move value into sell lock.
             <LockIdValue<T>>::insert(lock_id, value);
             // Index event.
-            Self::index_account(seller.clone());
+            Self::index_account(creator.clone());
             Self::index_account(recipient.clone());
             // Log info.
-            Self::deposit_event(Event::SellLock(seller, recipient, hashed_secret, timeout, value, lock_id, buy_asset_id, buy_lock_id));
+            Self::deposit_event(Event::LockSell(creator, recipient, hashed_secret, timeout, value, buy_asset_id, buy_lock_id));
 			Ok(().into())
 		}
 
         #[pallet::weight(50_000_000)]
-		pub fn decline_by_recipient(origin: OriginFor<T>, sender: T::AccountId, hashed_secret: AcuityHashedSecret, timeout: T::Moment) -> DispatchResultWithPostInfo {
+		pub fn decline(origin: OriginFor<T>, creator: T::AccountId, hashed_secret: AcuityHashedSecret, timeout: T::Moment) -> DispatchResultWithPostInfo {
             let recipient = ensure_signed(origin)?;
             // Calculate lock_id.
-            let lock_id = Self::get_lock_id(sender.clone(), recipient.clone(), hashed_secret, timeout);
+            let lock_id = Self::get_lock_id(creator.clone(), recipient.clone(), hashed_secret, timeout);
             // Get lock value.
             let value = match <LockIdValue<T>>::get(lock_id) {
                 Some(value) => value,
                 None => return Err(Error::<T>::LockDoesNotExist.into()),
             };
+
+            //----------------------------------------
+
             // Delete lock.
             LockIdValue::<T>::remove(lock_id);
-            // Transfer the value back to the sender.
-            T::Currency::transfer(&Self::fund_account_id(), &sender, value, AllowDeath)
+            // Transfer the value back to the creator.
+            T::Currency::transfer(&Self::fund_account_id(), &creator, value, AllowDeath)
                 .map_err(|_| DispatchError::Other("Can't transfer value."))?;
             // Index event.
-            Self::index_account(sender.clone());
+            Self::index_account(creator.clone());
             Self::index_account(recipient.clone());
             // Log info.
-            Self::deposit_event(Event::DeclineByRecipient(sender, recipient, lock_id));
+            Self::deposit_event(Event::Decline(creator, recipient, lock_id));
             Ok(().into())
         }
 
         #[pallet::weight(50_000_000)]
-		pub fn unlock_by_sender(origin: OriginFor<T>, recipient: T::AccountId, secret: AcuitySecret, timeout: T::Moment) -> DispatchResultWithPostInfo {
-            let sender = ensure_signed(origin)?;
+		pub fn unlock(origin: OriginFor<T>, creator: T::AccountId, secret: AcuitySecret, timeout: T::Moment) -> DispatchResultWithPostInfo {
+            let recipient = ensure_signed(origin)?;
             // Calculate hashed secret.
             let mut hashed_secret = AcuityHashedSecret::default();
             hashed_secret.0.copy_from_slice(&keccak_256(&secret.encode()));
             // Calculate lock_id.
-            let lock_id = Self::get_lock_id(sender.clone(), recipient.clone(), hashed_secret, timeout);
+            let lock_id = Self::get_lock_id(creator.clone(), recipient.clone(), hashed_secret, timeout);
             // Check lock has not timed out.
             frame_support::ensure!(timeout > <pallet_timestamp::Pallet<T>>::get(), Error::<T>::LockTimedOut);
             // Get lock value.
@@ -200,52 +209,27 @@ pub mod pallet {
                 Some(value) => value,
                 None => return Err(Error::<T>::LockDoesNotExist.into()),
             };
+
+            //----------------------------------------
+
             // Delete lock.
             LockIdValue::<T>::remove(lock_id);
             // Transfer the value.
             T::Currency::transfer(&Self::fund_account_id(), &recipient, value, AllowDeath)
                 .map_err(|_| DispatchError::Other("Can't transfer value."))?;
             // Index event.
-            Self::index_account(sender.clone());
+            Self::index_account(creator.clone());
             Self::index_account(recipient.clone());
             // Log info.
-            Self::deposit_event(Event::UnlockBySender(sender, recipient, lock_id, secret));
+            Self::deposit_event(Event::Unlock(creator, recipient, lock_id, secret));
             Ok(().into())
         }
 
         #[pallet::weight(50_000_000)]
-		pub fn unlock_by_recipient(origin: OriginFor<T>, sender: T::AccountId, secret: AcuitySecret, timeout: T::Moment) -> DispatchResultWithPostInfo {
-            let recipient = ensure_signed(origin)?;
-            // Calculate hashed secret.
-            let mut hashed_secret = AcuityHashedSecret::default();
-            hashed_secret.0.copy_from_slice(&keccak_256(&secret.encode()));
+		pub fn retrieve(origin: OriginFor<T>, recipient: T::AccountId, hashed_secret: AcuityHashedSecret, timeout: T::Moment) -> DispatchResultWithPostInfo {
+            let creator = ensure_signed(origin)?;
             // Calculate lock_id.
-            let lock_id = Self::get_lock_id(sender.clone(), recipient.clone(), hashed_secret, timeout);
-            // Check lock has not timed out.
-            frame_support::ensure!(timeout > <pallet_timestamp::Pallet<T>>::get(), Error::<T>::LockTimedOut);
-            // Get lock value.
-            let value = match <LockIdValue<T>>::get(lock_id) {
-                Some(value) => value,
-                None => return Err(Error::<T>::LockDoesNotExist.into()),
-            };
-            // Delete lock.
-            LockIdValue::<T>::remove(lock_id);
-            // Transfer the value.
-            T::Currency::transfer(&Self::fund_account_id(), &recipient, value, AllowDeath)
-                .map_err(|_| DispatchError::Other("Can't transfer value."))?;
-            // Index event.
-            Self::index_account(sender.clone());
-            Self::index_account(recipient.clone());
-            // Log info.
-            Self::deposit_event(Event::UnlockByRecipient(sender, recipient, lock_id, secret));
-            Ok(().into())
-        }
-
-        #[pallet::weight(50_000_000)]
-		pub fn timeout_value(origin: OriginFor<T>, recipient: T::AccountId, hashed_secret: AcuityHashedSecret, timeout: T::Moment) -> DispatchResultWithPostInfo {
-            let sender = ensure_signed(origin)?;
-            // Calculate lock_id.
-            let lock_id = Self::get_lock_id(sender.clone(), recipient.clone(), hashed_secret, timeout);
+            let lock_id = Self::get_lock_id(creator.clone(), recipient.clone(), hashed_secret, timeout);
             // Check lock has timed out.
             frame_support::ensure!(timeout <= <pallet_timestamp::Pallet<T>>::get(), Error::<T>::LockNotTimedOut);
             // Get lock value.
@@ -253,16 +237,19 @@ pub mod pallet {
                 Some(value) => value,
                 None => return Err(Error::<T>::LockDoesNotExist.into()),
             };
+
+            //----------------------------------------
+
             // Delete lock.
             LockIdValue::<T>::remove(lock_id);
             // Transfer the value.
-            T::Currency::transfer(&Self::fund_account_id(), &sender, value, AllowDeath)
+            T::Currency::transfer(&Self::fund_account_id(), &creator, value, AllowDeath)
                 .map_err(|_| DispatchError::Other("Can't transfer value."))?;
             // Index event.
-            Self::index_account(sender.clone());
+            Self::index_account(creator.clone());
             Self::index_account(recipient.clone());
             // Log info.
-            Self::deposit_event(Event::Timeout(sender, recipient, lock_id));
+            Self::deposit_event(Event::Retrieve(creator, recipient, lock_id));
             Ok(().into())
         }
 	}
@@ -270,18 +257,16 @@ pub mod pallet {
 	#[pallet::event]
 	#[pallet::generate_deposit(pub fn deposit_event)]
 	pub enum Event<T: Config> {
-        /// Value has been locked with sell asset info. \[sender, recipient, hashed_secret, timeout, value, lock_id, sell_asset_id, sell_price\]
-        BuyLock(T::AccountId, T::AccountId, AcuityHashedSecret, T::Moment, BalanceOf<T>, AcuityLockId, AcuityAssetId, u128),
-        /// Value has been locked. \[sender, recipient, hashed_secret, timeout, value, lock_id, buy_asset_id, buy_lock_id\]
-        SellLock(T::AccountId, T::AccountId, AcuityHashedSecret, T::Moment, BalanceOf<T>, AcuityLockId, AcuityAssetId, AcuityLockId),
-        /// Lock has been declined by the recipient. \[sender, recipient, lock_id\]
-        DeclineByRecipient(T::AccountId, T::AccountId, AcuityLockId),
-        /// Value has been unlocked by the sender. \[sender, recipient, lock_id, secret\]
-        UnlockBySender(T::AccountId, T::AccountId, AcuityLockId, AcuitySecret),
-        /// Value has been unlocked by the recipient. \[sender, recipient, lock_id, secret\]
-        UnlockByRecipient(T::AccountId, T::AccountId, AcuityLockId, AcuitySecret),
-        /// Value has been timed out. \[sender, recipient, lock_id\]
-        Timeout(T::AccountId, T::AccountId, AcuityLockId),
+        /// Value has been locked with sell asset info. \[creator, recipient, hashed_secret, timeout, value, sell_asset_id, sell_price\]
+        LockBuy(T::AccountId, T::AccountId, AcuityHashedSecret, T::Moment, BalanceOf<T>, AcuityAssetId, u128),
+        /// Value has been locked. \[creator, recipient, hashed_secret, timeout, value, buy_asset_id, buy_lock_id\]
+        LockSell(T::AccountId, T::AccountId, AcuityHashedSecret, T::Moment, BalanceOf<T>, AcuityAssetId, AcuityLockId),
+        /// Lock has been declined by the recipient. \[creator, recipient, lock_id\]
+        Decline(T::AccountId, T::AccountId, AcuityLockId),
+        /// Value has been unlocked by the recipient. \[creator, recipient, lock_id, secret\]
+        Unlock(T::AccountId, T::AccountId, AcuityLockId, AcuitySecret),
+        /// Value has been timed out. \[creator, recipient, lock_id\]
+        Retrieve(T::AccountId, T::AccountId, AcuityLockId),
 	}
 
 	#[pallet::error]
