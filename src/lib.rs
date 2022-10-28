@@ -203,7 +203,7 @@ pub mod pallet {
             // Calculate lock_id.
             let lock_id = Self::get_lock_id(creator.clone(), recipient.clone(), hashed_secret, timeout);
             // Check lock has not timed out.
-            frame_support::ensure!(timeout > <pallet_timestamp::Pallet<T>>::get(), Error::<T>::LockTimedOut);
+            frame_support::ensure!(<pallet_timestamp::Pallet<T>>::get() < timeout, Error::<T>::LockTimedOut);
             // Get lock value.
             let value = match <LockIdValue<T>>::get(lock_id) {
                 Some(value) => value,
@@ -231,7 +231,7 @@ pub mod pallet {
             // Calculate lock_id.
             let lock_id = Self::get_lock_id(creator.clone(), recipient.clone(), hashed_secret, timeout);
             // Check lock has timed out.
-            frame_support::ensure!(timeout <= <pallet_timestamp::Pallet<T>>::get(), Error::<T>::LockNotTimedOut);
+            frame_support::ensure!(<pallet_timestamp::Pallet<T>>::get() >= timeout, Error::<T>::LockNotTimedOut);
             // Get lock value.
             let value = match <LockIdValue<T>>::get(lock_id) {
                 Some(value) => value,
