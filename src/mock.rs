@@ -100,17 +100,13 @@ impl Config for Test {
 
 const A: u64 = 1;
 const B: u64 = 2;
-const C: u64 = 3;
-const D: u64 = 4;
 
 pub fn new_test_ext() -> sp_io::TestExternalities {
 	let mut t = frame_system::GenesisConfig::default().build_storage::<Test>().unwrap();
 	let genesis = pallet_balances::GenesisConfig::<Test> {
 		balances: vec![
 			(A, 100),
-			(B, 200),
-			(C, 100),
-			(D, 200),
+			(B, 100),
 		],
 	};
 	genesis.assimilate_storage(&mut t).unwrap();

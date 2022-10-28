@@ -69,7 +69,10 @@ fn lock_buy() {
         hashed_secret.0.copy_from_slice(&keccak_256(&secret.encode()));
         let timeout = <pallet_timestamp::Pallet<Test>>::get() + 1000;
 		let value = 50;
+
         assert_ok!(AcuityAtomicSwap::lock_buy(RuntimeOrigin::signed(B), A, hashed_secret, timeout, value, AcuityAssetId::default(), 5));
+		assert_eq!(Balances::free_balance(B), 50);
+		assert_eq!(Balances::free_balance(AcuityAtomicSwap::fund_account_id()), 50);
 
         let lock_id = AcuityAtomicSwap::get_lock_id(B, A, hashed_secret, timeout);
 		assert_eq!(AcuityAtomicSwap::lock_id_value(lock_id).unwrap(), value);
@@ -139,6 +142,8 @@ fn lock_sell() {
         let timeout = <pallet_timestamp::Pallet<Test>>::get() + 1000;
 		let value = 50;
         assert_ok!(AcuityAtomicSwap::lock_sell(RuntimeOrigin::signed(B), A, hashed_secret, timeout, value, AcuityAssetId::default(), AcuityLockId::default()));
+		assert_eq!(Balances::free_balance(B), 50);
+		assert_eq!(Balances::free_balance(AcuityAtomicSwap::fund_account_id()), 50);
 
         let lock_id = AcuityAtomicSwap::get_lock_id(B, A, hashed_secret, timeout);
 		assert_eq!(AcuityAtomicSwap::lock_id_value(lock_id).unwrap(), value);
@@ -185,9 +190,13 @@ fn decline() {
 		let lock_id = AcuityAtomicSwap::get_lock_id(B, A, hashed_secret, timeout);
 
         assert_ok!(AcuityAtomicSwap::lock_buy(RuntimeOrigin::signed(B), A, hashed_secret, timeout, value, AcuityAssetId::default(), 5));
+		assert_eq!(Balances::free_balance(B), 50);
+		assert_eq!(Balances::free_balance(AcuityAtomicSwap::fund_account_id()), 50);
 		assert_eq!(AcuityAtomicSwap::lock_id_value(lock_id), Some(value));
 
 		assert_ok!(AcuityAtomicSwap::decline(RuntimeOrigin::signed(A), B, hashed_secret, timeout));
+		assert_eq!(Balances::free_balance(B), 100);
+		assert_eq!(Balances::free_balance(AcuityAtomicSwap::fund_account_id()), 0);
 		assert_eq!(AcuityAtomicSwap::lock_id_value(lock_id), None);
 	});
 }
@@ -263,9 +272,13 @@ fn unlock() {
 		let lock_id = AcuityAtomicSwap::get_lock_id(B, A, hashed_secret, timeout);
 
         assert_ok!(AcuityAtomicSwap::lock_buy(RuntimeOrigin::signed(B), A, hashed_secret, timeout, value, AcuityAssetId::default(), 5));
+		assert_eq!(Balances::free_balance(B), 50);
+		assert_eq!(Balances::free_balance(AcuityAtomicSwap::fund_account_id()), 50);
 		assert_eq!(AcuityAtomicSwap::lock_id_value(lock_id), Some(value));
 
 		assert_ok!(AcuityAtomicSwap::unlock(RuntimeOrigin::signed(A), B, secret, timeout));
+		assert_eq!(Balances::free_balance(A), 150);
+		assert_eq!(Balances::free_balance(AcuityAtomicSwap::fund_account_id()), 0);
 		assert_eq!(AcuityAtomicSwap::lock_id_value(lock_id), None);
 	});
 }
@@ -342,9 +355,13 @@ fn retrieve() {
 		let lock_id = AcuityAtomicSwap::get_lock_id(B, A, hashed_secret, timeout);
 
         assert_ok!(AcuityAtomicSwap::lock_buy(RuntimeOrigin::signed(B), A, hashed_secret, timeout, value, AcuityAssetId::default(), 5));
+		assert_eq!(Balances::free_balance(B), 50);
+		assert_eq!(Balances::free_balance(AcuityAtomicSwap::fund_account_id()), 50);
 		assert_eq!(AcuityAtomicSwap::lock_id_value(lock_id), Some(value));
 
 		assert_ok!(AcuityAtomicSwap::retrieve(RuntimeOrigin::signed(B), A, hashed_secret, timeout));
+		assert_eq!(Balances::free_balance(B), 100);
+		assert_eq!(Balances::free_balance(AcuityAtomicSwap::fund_account_id()), 0);
 		assert_eq!(AcuityAtomicSwap::lock_id_value(lock_id), None);
 	});
 }
