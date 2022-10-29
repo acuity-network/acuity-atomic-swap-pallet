@@ -139,7 +139,7 @@ pub mod pallet {
             Self::index_account(creator.clone());
             Self::index_account(recipient.clone());
             // Log info.
-            Self::deposit_event(Event::LockBuy(creator, recipient, hashed_secret, timeout, value, sell_asset_id, sell_price));
+            Self::deposit_event(Event::LockBuy(creator, recipient, hashed_secret, timeout, value, lock_id, sell_asset_id, sell_price));
 			Ok(().into())
 		}
 
@@ -164,7 +164,7 @@ pub mod pallet {
             Self::index_account(creator.clone());
             Self::index_account(recipient.clone());
             // Log info.
-            Self::deposit_event(Event::LockSell(creator, recipient, hashed_secret, timeout, value, buy_asset_id, buy_lock_id));
+            Self::deposit_event(Event::LockSell(creator, recipient, hashed_secret, timeout, value, lock_id, buy_asset_id, buy_lock_id));
 			Ok(().into())
 		}
 
@@ -257,10 +257,10 @@ pub mod pallet {
 	#[pallet::event]
 	#[pallet::generate_deposit(pub fn deposit_event)]
 	pub enum Event<T: Config> {
-        /// Value has been locked with sell asset info. \[creator, recipient, hashed_secret, timeout, value, sell_asset_id, sell_price\]
-        LockBuy(T::AccountId, T::AccountId, AcuityHashedSecret, T::Moment, BalanceOf<T>, AcuityAssetId, u128),
-        /// Value has been locked. \[creator, recipient, hashed_secret, timeout, value, buy_asset_id, buy_lock_id\]
-        LockSell(T::AccountId, T::AccountId, AcuityHashedSecret, T::Moment, BalanceOf<T>, AcuityAssetId, AcuityLockId),
+        /// Value has been locked with sell asset info. \[creator, recipient, hashed_secret, timeout, value, lock_id, sell_asset_id, sell_price\]
+        LockBuy(T::AccountId, T::AccountId, AcuityHashedSecret, T::Moment, BalanceOf<T>, AcuityLockId, AcuityAssetId, u128),
+        /// Value has been locked. \[creator, recipient, hashed_secret, timeout, value, lock_id, buy_asset_id, buy_lock_id\]
+        LockSell(T::AccountId, T::AccountId, AcuityHashedSecret, T::Moment, BalanceOf<T>, AcuityLockId, AcuityAssetId, AcuityLockId),
         /// Lock has been declined by the recipient. \[creator, recipient, lock_id\]
         Decline(T::AccountId, T::AccountId, AcuityLockId),
         /// Value has been unlocked by the recipient. \[creator, recipient, lock_id, secret\]
