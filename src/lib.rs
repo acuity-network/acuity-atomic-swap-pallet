@@ -293,22 +293,22 @@ pub mod pallet {
     #[pallet::storage]
     #[pallet::getter(fn account_start_index)]
     pub(super) type AccountStartIndex<T: Config> = StorageMap<_,
-        Blake2_128Concat, T::AccountId,
+        Identity, T::AccountId,
         u64, ValueQuery
     >;
 
     #[pallet::storage]
     #[pallet::getter(fn account_next_index)]
     pub(super) type AccountNextIndex<T: Config> = StorageMap<_,
-        Blake2_128Concat, T::AccountId,
+        Identity, T::AccountId,
         u64, ValueQuery
     >;
 
     #[pallet::storage]
     #[pallet::getter(fn account_index_height)]
     pub(super) type AccountIndexHeight<T: Config> = StorageDoubleMap<_,
-        Blake2_128Concat, T::AccountId,
-        Blake2_128Concat, u64,
+        Identity, T::AccountId,
+        Twox64Concat, u64,
         <T as frame_system::Config>::BlockNumber
     >;
 
