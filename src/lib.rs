@@ -118,6 +118,7 @@ pub mod pallet {
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
 
+        #[pallet::call_index(0)]
         #[pallet::weight(50_000_000)]
 		pub fn lock_buy(origin: OriginFor<T>, recipient: T::AccountId, hashed_secret: AcuityHashedSecret, timeout: T::Moment, value: BalanceOf<T>, sell_asset_id: AcuityAssetId, sell_price: u128) -> DispatchResultWithPostInfo {
             let creator = ensure_signed(origin)?;
@@ -143,6 +144,7 @@ pub mod pallet {
 			Ok(().into())
 		}
 
+        #[pallet::call_index(1)]
         #[pallet::weight(50_000_000)]
 		pub fn lock_sell(origin: OriginFor<T>, recipient: T::AccountId, hashed_secret: AcuityHashedSecret, timeout: T::Moment, value: BalanceOf<T>, buy_asset_id: AcuityAssetId, buy_lock_id: AcuityLockId) -> DispatchResultWithPostInfo {
             let creator = ensure_signed(origin)?;
@@ -168,6 +170,7 @@ pub mod pallet {
 			Ok(().into())
 		}
 
+        #[pallet::call_index(2)]
         #[pallet::weight(50_000_000)]
 		pub fn decline(origin: OriginFor<T>, creator: T::AccountId, hashed_secret: AcuityHashedSecret, timeout: T::Moment) -> DispatchResultWithPostInfo {
             let recipient = ensure_signed(origin)?;
@@ -194,6 +197,7 @@ pub mod pallet {
             Ok(().into())
         }
 
+        #[pallet::call_index(3)]
         #[pallet::weight(50_000_000)]
 		pub fn unlock(origin: OriginFor<T>, creator: T::AccountId, secret: AcuitySecret, timeout: T::Moment) -> DispatchResultWithPostInfo {
             let recipient = ensure_signed(origin)?;
@@ -225,6 +229,7 @@ pub mod pallet {
             Ok(().into())
         }
 
+        #[pallet::call_index(4)]
         #[pallet::weight(50_000_000)]
 		pub fn retrieve(origin: OriginFor<T>, recipient: T::AccountId, hashed_secret: AcuityHashedSecret, timeout: T::Moment) -> DispatchResultWithPostInfo {
             let creator = ensure_signed(origin)?;

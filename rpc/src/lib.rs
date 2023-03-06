@@ -1,13 +1,12 @@
 use codec::Codec;
 use jsonrpsee::{
-	core::{async_trait, RpcResult},
+	core::RpcResult,
 	proc_macros::rpc,
 	types::error::{CallError, ErrorObject},
 };
 use sp_api::ProvideRuntimeApi;
 use sp_blockchain::HeaderBackend;
 use sp_runtime::{
-	generic::BlockId,
 	traits::Block as BlockT,
 };
 
@@ -50,7 +49,6 @@ impl From<Error> for i32 {
 	}
 }
 
-#[async_trait]
 impl<C, AccountId, Block, BlockNumber>
 	AtomicSwapApiServer<AcuityAssetId, AccountId, BlockNumber, <Block as BlockT>::Hash>
 	for AtomicSwap<C, Block>
@@ -66,15 +64,12 @@ where
 	fn get_index_blocks(
         &self,
 		account: AccountId,
-        at: Option<<Block as BlockT>::Hash>,
+        at: Option<Block::Hash>,
     ) -> RpcResult<Vec<BlockNumber>> {
-    	let api = self.client.runtime_api();
-        let at = BlockId::hash(at.unwrap_or_else(||
-            // If the block hash is not supplied assume the best block.
-            self.client.info().best_hash
-        ));
+        	let api = self.client.runtime_api();
+		let at_hash = at.unwrap_or_else(|| self.client.info().best_hash);
 
-		api.get_index_blocks(&at, account).map_err(|e| {
+		api.get_index_blocks(at_hash, account).map_err(|e| {
 			CallError::Custom(ErrorObject::owned(
 				Error::RuntimeError.into(),
 				"Unable to query dispatch info.",
