@@ -89,14 +89,13 @@ pub struct AcuitySecret([u8; 32]);
 type BalanceOf<T> =
     <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
 
-#[frame_support::pallet]
+#[frame_support::pallet(dev_mode)]
 pub mod pallet {
     use super::*;
     use frame_support::pallet_prelude::*;
     use frame_system::pallet_prelude::*;
 
     #[pallet::pallet]
-    #[pallet::generate_store(pub(super) trait Store)]
     pub struct Pallet<T>(_);
 
     /// Configure the pallet by specifying the parameters and types on which it depends.
@@ -145,9 +144,6 @@ pub mod pallet {
                 .map_err(|_| DispatchError::Other("Can't transfer value."))?;
             // Move value into buy lock.
             <LockIdValue<T>>::insert(lock_id, value);
-            // Index event.
-            Self::index_account(creator.clone());
-            Self::index_account(recipient.clone());
             // Log info.
             Self::deposit_event(Event::LockBuy(
                 creator,
@@ -192,9 +188,6 @@ pub mod pallet {
                 .map_err(|_| DispatchError::Other("Can't transfer value."))?;
             // Move value into sell lock.
             <LockIdValue<T>>::insert(lock_id, value);
-            // Index event.
-            Self::index_account(creator.clone());
-            Self::index_account(recipient.clone());
             // Log info.
             Self::deposit_event(Event::LockSell(
                 creator,
@@ -234,9 +227,6 @@ pub mod pallet {
             // Transfer the value back to the creator.
             T::Currency::transfer(&Self::fund_account_id(), &creator, value, AllowDeath)
                 .map_err(|_| DispatchError::Other("Can't transfer value."))?;
-            // Index event.
-            Self::index_account(creator.clone());
-            Self::index_account(recipient.clone());
             // Log info.
             Self::deposit_event(Event::Decline(creator, recipient, lock_id));
             Ok(().into())
@@ -277,9 +267,6 @@ pub mod pallet {
             // Transfer the value.
             T::Currency::transfer(&Self::fund_account_id(), &recipient, value, AllowDeath)
                 .map_err(|_| DispatchError::Other("Can't transfer value."))?;
-            // Index event.
-            Self::index_account(creator.clone());
-            Self::index_account(recipient.clone());
             // Log info.
             Self::deposit_event(Event::Unlock(creator, recipient, lock_id, secret));
             Ok(().into())
@@ -315,9 +302,6 @@ pub mod pallet {
             // Transfer the value.
             T::Currency::transfer(&Self::fund_account_id(), &creator, value, AllowDeath)
                 .map_err(|_| DispatchError::Other("Can't transfer value."))?;
-            // Index event.
-            Self::index_account(creator.clone());
-            Self::index_account(recipient.clone());
             // Log info.
             Self::deposit_event(Event::Retrieve(creator, recipient, lock_id));
             Ok(().into())
@@ -375,27 +359,6 @@ pub mod pallet {
     #[pallet::getter(fn lock_id_value)]
     pub(super) type LockIdValue<T: Config> = StorageMap<_, Identity, AcuityLockId, BalanceOf<T>>;
 
-    #[pallet::storage]
-    #[pallet::getter(fn account_start_index)]
-    pub(super) type AccountStartIndex<T: Config> =
-        StorageMap<_, Identity, T::AccountId, u64, ValueQuery>;
-
-    #[pallet::storage]
-    #[pallet::getter(fn account_next_index)]
-    pub(super) type AccountNextIndex<T: Config> =
-        StorageMap<_, Identity, T::AccountId, u64, ValueQuery>;
-
-    #[pallet::storage]
-    #[pallet::getter(fn account_index_height)]
-    pub(super) type AccountIndexHeight<T: Config> = StorageDoubleMap<
-        _,
-        Identity,
-        T::AccountId,
-        Twox64Concat,
-        u64,
-        <T as frame_system::Config>::BlockNumber,
-    >;
-
     impl<T: Config> Pallet<T> {
         /// The account ID of the fund pot.
         ///
@@ -422,30 +385,6 @@ pub mod pallet {
                 .concat(),
             ));
             lock_id
-        }
-
-        pub fn index_account(account: T::AccountId) {
-            // Get next index.
-            let i = <AccountNextIndex<T>>::get(&account);
-            // Insert current block number.
-            <AccountIndexHeight<T>>::insert(&account, i, <frame_system::Pallet<T>>::block_number());
-            // Update the next index.
-            <AccountNextIndex<T>>::insert(account, i + 1);
-        }
-
-        pub fn get_index_blocks(
-            account: T::AccountId,
-        ) -> sp_std::prelude::Vec<<T as frame_system::Config>::BlockNumber> {
-            let mut blocks = sp_std::prelude::Vec::new();
-            let mut i = 0;
-            loop {
-                blocks.push(match <AccountIndexHeight<T>>::get(&account, i) {
-                    Some(height) => height,
-                    None => break,
-                });
-                i += 1;
-            }
-            blocks
         }
     }
 }
